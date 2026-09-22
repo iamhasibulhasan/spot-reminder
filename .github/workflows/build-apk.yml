@@ -124,6 +124,7 @@ jobs:
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
               <application
+                  android:name=".App"
                   android:allowBackup="true"
                   android:icon="@mipmap/ic_launcher"
                   android:label="@string/app_name"
@@ -140,6 +141,11 @@ jobs:
                       </intent-filter>
                   </activity>
                   <activity
+                      android:name=".SettingsActivity"
+                      android:exported="false"
+                      android:label="Settings"
+                      android:windowSoftInputMode="adjustResize" />
+                  <activity
                       android:name=".MapPickerActivity"
                       android:exported="false"
                       android:label="Pick a city" />
@@ -147,7 +153,32 @@ jobs:
           </manifest>
           SPOT_EOF_5
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/DriveBackup.kt <<'SPOT_EOF_6'
+          cat > app/src/main/java/com/spotreminder/app/App.kt <<'SPOT_EOF_6'
+          package com.spotreminder.app
+
+          import android.app.Application
+          import androidx.appcompat.app.AppCompatDelegate
+
+          class App : Application() {
+              override fun onCreate() {
+                  super.onCreate()
+                  applyTheme(Store.themeMode(this))
+              }
+
+              companion object {
+                  fun applyTheme(mode: String) {
+                      val night = when (mode) {
+                          "light" -> AppCompatDelegate.MODE_NIGHT_NO
+                          "dark" -> AppCompatDelegate.MODE_NIGHT_YES
+                          else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                      }
+                      AppCompatDelegate.setDefaultNightMode(night)
+                  }
+              }
+          }
+          SPOT_EOF_6
+          mkdir -p app/src/main/java/com/spotreminder/app
+          cat > app/src/main/java/com/spotreminder/app/DriveBackup.kt <<'SPOT_EOF_7'
           package com.spotreminder.app
 
           import android.content.Context
@@ -252,9 +283,9 @@ jobs:
                   return c.inputStream.bufferedReader().use { it.readText() }
               }
           }
-          SPOT_EOF_6
+          SPOT_EOF_7
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/LocationChecker.kt <<'SPOT_EOF_7'
+          cat > app/src/main/java/com/spotreminder/app/LocationChecker.kt <<'SPOT_EOF_8'
           package com.spotreminder.app
 
           import android.annotation.SuppressLint
@@ -428,9 +459,9 @@ jobs:
                   return out
               }
           }
-          SPOT_EOF_7
+          SPOT_EOF_8
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/LocationWorker.kt <<'SPOT_EOF_8'
+          cat > app/src/main/java/com/spotreminder/app/LocationWorker.kt <<'SPOT_EOF_9'
           package com.spotreminder.app
 
           import android.content.Context
@@ -446,32 +477,24 @@ jobs:
                   return Result.success()
               }
           }
-          SPOT_EOF_8
+          SPOT_EOF_9
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/MainActivity.kt <<'SPOT_EOF_9'
+          cat > app/src/main/java/com/spotreminder/app/MainActivity.kt <<'SPOT_EOF_10'
           package com.spotreminder.app
 
-          import android.Manifest
           import android.content.Intent
-          import android.content.pm.PackageManager
           import android.graphics.Typeface
-          import android.net.Uri
-          import android.os.Build
           import android.os.Bundle
           import android.os.Handler
           import android.os.Looper
-          import android.provider.Settings
           import android.text.Editable
           import android.text.TextWatcher
           import android.view.Gravity
           import android.view.View
-          import android.widget.ArrayAdapter
           import android.widget.CheckBox
-          import android.widget.Filter
           import android.widget.FrameLayout
           import android.widget.LinearLayout
           import android.widget.TextView
-          import android.widget.Toast
           import androidx.activity.result.contract.ActivityResultContracts
           import androidx.appcompat.app.AlertDialog
           import androidx.appcompat.app.AppCompatActivity
@@ -479,12 +502,6 @@ jobs:
           import androidx.work.ExistingPeriodicWorkPolicy
           import androidx.work.PeriodicWorkRequestBuilder
           import androidx.work.WorkManager
-          import com.google.android.gms.auth.api.signin.GoogleSignIn
-          import com.google.android.gms.auth.api.signin.GoogleSignInAccount
-          import com.google.android.gms.auth.api.signin.GoogleSignInClient
-          import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-          import com.google.android.gms.common.api.ApiException
-          import com.google.android.gms.common.api.Scope
           import com.google.android.material.button.MaterialButton
           import com.google.android.material.textfield.TextInputEditText
           import com.google.android.material.textfield.TextInputLayout
@@ -496,8 +513,8 @@ jobs:
               private lateinit var statusLabel: TextView
               private lateinit var statusCity: TextView
               private lateinit var statusDetail: TextView
-              private lateinit var setupCard: LinearLayout
-              private lateinit var setupText: TextView
+              private lateinit var nudge: LinearLayout
+              private lateinit var nudgeText: TextView
               private lateinit var remindCard: LinearLayout
               private lateinit var remindTitle: TextView
               private lateinit var remindList: LinearLayout
@@ -526,27 +543,6 @@ jobs:
               private var cityLat: Double? = null
               private var cityLon: Double? = null
 
-              // Google sign-in + Drive backup
-              private lateinit var googleClient: GoogleSignInClient
-              private var account: GoogleSignInAccount? = null
-              private lateinit var backupStatus: TextView
-              private lateinit var btnSignIn: MaterialButton
-              private lateinit var btnSignOut: MaterialButton
-              private lateinit var backupActions: LinearLayout
-
-              private val permLauncher =
-                  registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-                      updateSetupCard()
-                      if (hasLocation() && !hasBackground()) askBackground()
-                      onReady()
-                  }
-
-              private val bgLauncher =
-                  registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-                      updateSetupCard()
-                      onReady()
-                  }
-
               private val mapLauncher =
                   registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
                       val name = r.data?.getStringExtra(MapPickerActivity.EXTRA_CITY)
@@ -564,17 +560,6 @@ jobs:
                       }
                   }
 
-              private val signInLauncher =
-                  registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
-                      val task = GoogleSignIn.getSignedInAccountFromIntent(r.data)
-                      try {
-                          account = task.getResult(ApiException::class.java)
-                          updateBackupUi()
-                      } catch (e: ApiException) {
-                          Toast.makeText(this, "Sign-in didn't complete (code ${e.statusCode}).", Toast.LENGTH_LONG).show()
-                      }
-                  }
-
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
                   setContentView(R.layout.activity_main)
@@ -582,8 +567,8 @@ jobs:
                   statusLabel = findViewById(R.id.statusLabel)
                   statusCity = findViewById(R.id.statusCity)
                   statusDetail = findViewById(R.id.statusDetail)
-                  setupCard = findViewById(R.id.setupCard)
-                  setupText = findViewById(R.id.setupText)
+                  nudge = findViewById(R.id.nudge)
+                  nudgeText = findViewById(R.id.nudgeText)
                   remindCard = findViewById(R.id.remindCard)
                   remindTitle = findViewById(R.id.remindTitle)
                   remindList = findViewById(R.id.remindList)
@@ -592,27 +577,6 @@ jobs:
                   cityInput = findViewById(R.id.cityInput)
                   spotInput = findViewById(R.id.spotInput)
                   savedList = findViewById(R.id.savedList)
-                  backupStatus = findViewById(R.id.backupStatus)
-                  btnSignIn = findViewById(R.id.btnSignIn)
-                  btnSignOut = findViewById(R.id.btnSignOut)
-                  backupActions = findViewById(R.id.backupActions)
-
-                  val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                      .requestScopes(Scope("https://www.googleapis.com/auth/drive.appdata"))
-                      .build()
-                  googleClient = GoogleSignIn.getClient(this, gso)
-                  account = GoogleSignIn.getLastSignedInAccount(this)
-                  updateBackupUi()
-
-                  btnSignIn.setOnClickListener { signInLauncher.launch(googleClient.signInIntent) }
-                  btnSignOut.setOnClickListener {
-                      googleClient.signOut().addOnCompleteListener {
-                          account = null
-                          updateBackupUi()
-                      }
-                  }
-                  findViewById<View>(R.id.btnBackupNow).setOnClickListener { doBackup() }
-                  findViewById<View>(R.id.btnRestore).setOnClickListener { doRestore() }
 
                   cityAdapter = NoFilterAdapter(this)
                   spotAdapter = NoFilterAdapter(this)
@@ -668,9 +632,13 @@ jobs:
                       }
                   })
 
+                  findViewById<View>(R.id.btnSettings).setOnClickListener {
+                      startActivity(Intent(this, SettingsActivity::class.java))
+                  }
+                  findViewById<View>(R.id.btnNudgeFix).setOnClickListener {
+                      startActivity(Intent(this, SettingsActivity::class.java))
+                  }
                   findViewById<View>(R.id.btnCheck).setOnClickListener { onReady() }
-                  findViewById<View>(R.id.btnSetup).setOnClickListener { requestSetup() }
-                  findViewById<View>(R.id.btnSettings).setOnClickListener { openAppSettings() }
                   findViewById<View>(R.id.btnAdd).setOnClickListener { addSpot() }
                   findViewById<View>(R.id.btnMap).setOnClickListener {
                       mapLauncher.launch(Intent(this, MapPickerActivity::class.java))
@@ -679,92 +647,36 @@ jobs:
                       dismissedKey = currentKey
                       renderReminder()
                   }
-                  findViewById<View>(R.id.btnBattery).setOnClickListener {
-                      try {
-                          startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-                      } catch (e: Exception) {
-                          openAppSettings()
-                      }
-                  }
 
                   Notifier.ensureChannel(this)
-                  updateSetupCard()
                   renderSaved()
               }
 
               override fun onResume() {
                   super.onResume()
-                  updateSetupCard()
+                  updateNudge()
                   onReady()
               }
 
-              // ---------- Permissions ----------
+              // ---------- Permission nudge (full controls live in Settings) ----------
 
-              private fun granted(p: String) =
-                  ContextCompat.checkSelfPermission(this, p) == PackageManager.PERMISSION_GRANTED
-
-              private fun hasLocation() = LocationChecker.hasLocationPermission(this)
-
-              private fun hasBackground() =
-                  Build.VERSION.SDK_INT < 29 || granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-
-              private fun hasNotif() =
-                  Build.VERSION.SDK_INT < 33 || granted(Manifest.permission.POST_NOTIFICATIONS)
-
-              private fun updateSetupCard() {
+              private fun updateNudge() {
                   val missing = mutableListOf<String>()
-                  if (!hasLocation()) missing.add("location")
-                  else if (!hasBackground()) missing.add("location \"Allow all the time\"")
-                  if (!hasNotif()) missing.add("notifications")
+                  if (!LocationChecker.hasLocationPermission(this)) missing.add("location")
+                  if (!Notifier.hasPermission(this)) missing.add("notifications")
                   if (missing.isEmpty()) {
-                      setupCard.visibility = View.GONE
+                      nudge.visibility = View.GONE
                   } else {
-                      setupCard.visibility = View.VISIBLE
-                      setupText.text = "To remind you even when the app is closed, turn on: " +
-                          missing.joinToString(" and ") + "."
+                      nudge.visibility = View.VISIBLE
+                      nudgeText.text = "Turn on " + missing.joinToString(" and ") + " for reminders to work."
                   }
-              }
-
-              private fun requestSetup() {
-                  val need = mutableListOf<String>()
-                  if (!hasLocation()) {
-                      need.add(Manifest.permission.ACCESS_FINE_LOCATION)
-                      need.add(Manifest.permission.ACCESS_COARSE_LOCATION)
-                  }
-                  if (!hasNotif()) need.add(Manifest.permission.POST_NOTIFICATIONS)
-                  if (need.isNotEmpty()) {
-                      permLauncher.launch(need.toTypedArray())
-                  } else if (!hasBackground()) {
-                      askBackground()
-                  }
-              }
-
-              private fun askBackground() {
-                  if (Build.VERSION.SDK_INT < 29 || hasBackground()) return
-                  AlertDialog.Builder(this)
-                      .setTitle("Allow location all the time")
-                      .setMessage(
-                          "To remind you when you arrive in a city, even when the app is closed, " +
-                              "set Location to \"Allow all the time\"."
-                      )
-                      .setPositiveButton("Continue") { _, _ ->
-                          if (Build.VERSION.SDK_INT >= 30) openAppSettings()
-                          else bgLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-                      }
-                      .setNegativeButton("Not now", null)
-                      .show()
-              }
-
-              private fun openAppSettings() {
-                  val i = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
-                  startActivity(i)
               }
 
               // ---------- Location check ----------
 
               private fun onReady() {
-                  if (!hasLocation()) {
-                      setStatus("Location", "Turned off", "Tap \"Turn on reminders\" below.")
+                  if (!LocationChecker.hasLocationPermission(this)) {
+                      setStatus("Location", "Turned off", "Open Settings to turn on reminders.")
                       return
                   }
                   scheduleWorker()
@@ -870,74 +782,6 @@ jobs:
                           spotSuggestions = hits
                           spotAdapter.replaceAll(hits.map { it.label })
                           if (hits.isNotEmpty() && spotInput.hasFocus()) spotInput.showDropDown()
-                      }
-                  }
-              }
-
-              private fun updateBackupUi() {
-                  val a = account
-                  if (a == null) {
-                      backupStatus.text = "Not signed in. Sign in to back up your cities and spots."
-                      btnSignIn.visibility = View.VISIBLE
-                      btnSignOut.visibility = View.GONE
-                      backupActions.visibility = View.GONE
-                  } else {
-                      backupStatus.text = "Signed in as " + (a.email ?: a.displayName ?: "your Google account")
-                      btnSignIn.visibility = View.GONE
-                      btnSignOut.visibility = View.VISIBLE
-                      backupActions.visibility = View.VISIBLE
-                  }
-              }
-
-              private fun doBackup() {
-                  val a = account?.email
-                  if (a == null) { Toast.makeText(this, "Sign in first.", Toast.LENGTH_SHORT).show(); return }
-                  val json = Store.rawData(this)
-                  Toast.makeText(this, "Backing up...", Toast.LENGTH_SHORT).show()
-                  io.execute {
-                      try {
-                          DriveBackup.backup(this, a, json)
-                          runOnUiThread { Toast.makeText(this, "Backed up to Google Drive.", Toast.LENGTH_SHORT).show() }
-                      } catch (e: DriveBackup.NeedsConsent) {
-                          runOnUiThread { Toast.makeText(this, "Please sign in again to allow Drive access.", Toast.LENGTH_LONG).show() }
-                      } catch (e: Exception) {
-                          runOnUiThread { Toast.makeText(this, "Backup failed. Check your internet and try again.", Toast.LENGTH_LONG).show() }
-                      }
-                  }
-              }
-
-              private fun doRestore() {
-                  val a = account?.email
-                  if (a == null) { Toast.makeText(this, "Sign in first.", Toast.LENGTH_SHORT).show(); return }
-                  Toast.makeText(this, "Checking for a backup...", Toast.LENGTH_SHORT).show()
-                  io.execute {
-                      try {
-                          val json = DriveBackup.restore(this, a)
-                          runOnUiThread {
-                              if (json == null) {
-                                  Toast.makeText(this, "No backup found yet.", Toast.LENGTH_LONG).show()
-                              } else {
-                                  AlertDialog.Builder(this)
-                                      .setTitle("Restore backup?")
-                                      .setMessage("This replaces the cities and spots saved on this phone with your Google Drive backup.")
-                                      .setPositiveButton("Restore") { _, _ ->
-                                          if (Store.setRawData(this, json)) {
-                                              recomputeMatch()
-                                              renderReminder()
-                                              renderSaved()
-                                              Toast.makeText(this, "Restored.", Toast.LENGTH_SHORT).show()
-                                          } else {
-                                              Toast.makeText(this, "That backup looked corrupted.", Toast.LENGTH_LONG).show()
-                                          }
-                                      }
-                                      .setNegativeButton("Cancel", null)
-                                      .show()
-                              }
-                          }
-                      } catch (e: DriveBackup.NeedsConsent) {
-                          runOnUiThread { Toast.makeText(this, "Please sign in again to allow Drive access.", Toast.LENGTH_LONG).show() }
-                      } catch (e: Exception) {
-                          runOnUiThread { Toast.makeText(this, "Restore failed. Check your internet and try again.", Toast.LENGTH_LONG).show() }
                       }
                   }
               }
@@ -1066,7 +910,7 @@ jobs:
 
               /** Shows a small dialog to rename a spot, keeping its done state. */
               private fun showEditSpotDialog(cityKey: String, oldName: String) {
-                  val input = com.google.android.material.textfield.TextInputEditText(this).apply {
+                  val input = TextInputEditText(this).apply {
                       setText(oldName)
                       setSelection(text?.length ?: 0)
                   }
@@ -1099,9 +943,9 @@ jobs:
                       .show()
               }
           }
-          SPOT_EOF_9
+          SPOT_EOF_10
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/MapPickerActivity.kt <<'SPOT_EOF_10'
+          cat > app/src/main/java/com/spotreminder/app/MapPickerActivity.kt <<'SPOT_EOF_11'
           package com.spotreminder.app
 
           import android.annotation.SuppressLint
@@ -1359,9 +1203,9 @@ jobs:
                   }
               }
           }
-          SPOT_EOF_10
+          SPOT_EOF_11
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/Notifier.kt <<'SPOT_EOF_11'
+          cat > app/src/main/java/com/spotreminder/app/Notifier.kt <<'SPOT_EOF_12'
           package com.spotreminder.app
 
           import android.Manifest
@@ -1379,6 +1223,10 @@ jobs:
           object Notifier {
               private const val CHANNEL = "arrival"
               private const val NOTIF_ID = 1001
+
+              fun hasPermission(ctx: Context): Boolean =
+                  Build.VERSION.SDK_INT < 33 ||
+                      ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
               fun ensureChannel(ctx: Context) {
                   if (Build.VERSION.SDK_INT >= 26) {
@@ -1424,9 +1272,9 @@ jobs:
                   }
               }
           }
-          SPOT_EOF_11
+          SPOT_EOF_12
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/Osm.kt <<'SPOT_EOF_12'
+          cat > app/src/main/java/com/spotreminder/app/Osm.kt <<'SPOT_EOF_13'
           package com.spotreminder.app
 
           import android.content.Context
@@ -1565,9 +1413,301 @@ jobs:
                   }
               }
           }
-          SPOT_EOF_12
+          SPOT_EOF_13
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/Store.kt <<'SPOT_EOF_13'
+          cat > app/src/main/java/com/spotreminder/app/SettingsActivity.kt <<'SPOT_EOF_14'
+          package com.spotreminder.app
+
+          import android.Manifest
+          import android.content.Intent
+          import android.content.pm.PackageManager
+          import android.graphics.Bitmap
+          import android.graphics.BitmapFactory
+          import android.net.Uri
+          import android.os.Build
+          import android.os.Bundle
+          import android.provider.Settings
+          import android.view.View
+          import android.view.ViewOutlineProvider
+          import android.widget.ImageView
+          import android.widget.RadioGroup
+          import android.widget.TextView
+          import android.widget.Toast
+          import androidx.activity.result.contract.ActivityResultContracts
+          import androidx.appcompat.app.AlertDialog
+          import androidx.appcompat.app.AppCompatActivity
+          import androidx.core.content.ContextCompat
+          import com.google.android.gms.auth.api.signin.GoogleSignIn
+          import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+          import com.google.android.gms.auth.api.signin.GoogleSignInClient
+          import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+          import com.google.android.gms.common.api.ApiException
+          import com.google.android.gms.common.api.Scope
+          import com.google.android.material.button.MaterialButton
+          import java.net.URL
+          import java.util.concurrent.Executors
+
+          class SettingsActivity : AppCompatActivity() {
+
+              private val io = Executors.newSingleThreadExecutor()
+
+              private lateinit var avatar: ImageView
+              private lateinit var profileName: TextView
+              private lateinit var profileEmail: TextView
+              private lateinit var btnSignIn: MaterialButton
+              private lateinit var btnSignOut: MaterialButton
+              private lateinit var backupActions: android.widget.LinearLayout
+              private lateinit var themeGroup: RadioGroup
+              private lateinit var permStatus: TextView
+
+              private lateinit var googleClient: GoogleSignInClient
+              private var account: GoogleSignInAccount? = null
+
+              private val signInLauncher =
+                  registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+                      val task = GoogleSignIn.getSignedInAccountFromIntent(r.data)
+                      try {
+                          account = task.getResult(ApiException::class.java)
+                          updateAccountUi()
+                      } catch (e: ApiException) {
+                          Toast.makeText(this, "Sign-in didn't complete (code ${e.statusCode}).", Toast.LENGTH_LONG).show()
+                      }
+                  }
+
+              private val permLauncher =
+                  registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+                      updatePermStatus()
+                      if (hasLocation() && !hasBackground()) askBackground()
+                  }
+
+              private val bgLauncher =
+                  registerForActivityResult(ActivityResultContracts.RequestPermission()) { updatePermStatus() }
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  setContentView(R.layout.activity_settings)
+
+                  findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
+
+                  avatar = findViewById(R.id.avatar)
+                  profileName = findViewById(R.id.profileName)
+                  profileEmail = findViewById(R.id.profileEmail)
+                  btnSignIn = findViewById(R.id.btnSignIn)
+                  btnSignOut = findViewById(R.id.btnSignOut)
+                  backupActions = findViewById(R.id.backupActions)
+                  themeGroup = findViewById(R.id.themeGroup)
+                  permStatus = findViewById(R.id.permStatus)
+
+                  avatar.clipToOutline = true
+                  avatar.outlineProvider = ViewOutlineProvider.BACKGROUND
+
+                  val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                      .requestScopes(Scope("https://www.googleapis.com/auth/drive.appdata"))
+                      .build()
+                  googleClient = GoogleSignIn.getClient(this, gso)
+                  account = GoogleSignIn.getLastSignedInAccount(this)
+                  updateAccountUi()
+
+                  btnSignIn.setOnClickListener { signInLauncher.launch(googleClient.signInIntent) }
+                  btnSignOut.setOnClickListener {
+                      googleClient.signOut().addOnCompleteListener {
+                          account = null
+                          updateAccountUi()
+                      }
+                  }
+                  findViewById<View>(R.id.btnBackupNow).setOnClickListener { doBackup() }
+                  findViewById<View>(R.id.btnRestore).setOnClickListener { doRestore() }
+
+                  // Theme
+                  when (Store.themeMode(this)) {
+                      "light" -> themeGroup.check(R.id.themeLight)
+                      "dark" -> themeGroup.check(R.id.themeDark)
+                      else -> themeGroup.check(R.id.themeSystem)
+                  }
+                  themeGroup.setOnCheckedChangeListener { _, checkedId ->
+                      val mode = when (checkedId) {
+                          R.id.themeLight -> "light"
+                          R.id.themeDark -> "dark"
+                          else -> "system"
+                      }
+                      if (mode != Store.themeMode(this)) {
+                          Store.setThemeMode(this, mode)
+                          App.applyTheme(mode)
+                      }
+                  }
+
+                  // Permissions
+                  findViewById<View>(R.id.btnGrant).setOnClickListener { requestPermissions() }
+                  findViewById<View>(R.id.btnAppSettings).setOnClickListener { openAppSettings() }
+                  findViewById<View>(R.id.btnBattery).setOnClickListener {
+                      try {
+                          startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                      } catch (e: Exception) {
+                          openAppSettings()
+                      }
+                  }
+                  updatePermStatus()
+              }
+
+              override fun onResume() {
+                  super.onResume()
+                  updatePermStatus()
+              }
+
+              // ---------- Account ----------
+
+              private fun updateAccountUi() {
+                  val a = account
+                  if (a == null) {
+                      profileName.text = "Not signed in"
+                      profileEmail.text = "Sign in to back up your cities and spots"
+                      btnSignIn.visibility = View.VISIBLE
+                      btnSignOut.visibility = View.GONE
+                      backupActions.visibility = View.GONE
+                      avatar.setImageResource(R.drawable.ic_person)
+                      avatar.setPadding(dp(10), dp(10), dp(10), dp(10))
+                  } else {
+                      profileName.text = a.displayName ?: "Signed in"
+                      profileEmail.text = a.email ?: ""
+                      btnSignIn.visibility = View.GONE
+                      btnSignOut.visibility = View.VISIBLE
+                      backupActions.visibility = View.VISIBLE
+                      loadAvatar(a.photoUrl)
+                  }
+              }
+
+              private fun loadAvatar(uri: Uri?) {
+                  avatar.setImageResource(R.drawable.ic_person)
+                  avatar.setPadding(dp(10), dp(10), dp(10), dp(10))
+                  if (uri == null) return
+                  io.execute {
+                      val bmp: Bitmap? = try {
+                          URL(uri.toString()).openStream().use { BitmapFactory.decodeStream(it) }
+                      } catch (e: Exception) {
+                          null
+                      }
+                      if (bmp != null) {
+                          runOnUiThread {
+                              avatar.setPadding(0, 0, 0, 0)
+                              avatar.setImageBitmap(bmp)
+                          }
+                      }
+                  }
+              }
+
+              private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+
+              private fun doBackup() {
+                  val email = account?.email
+                  if (email == null) { Toast.makeText(this, "Sign in first.", Toast.LENGTH_SHORT).show(); return }
+                  val json = Store.rawData(this)
+                  Toast.makeText(this, "Backing up...", Toast.LENGTH_SHORT).show()
+                  io.execute {
+                      try {
+                          DriveBackup.backup(this, email, json)
+                          runOnUiThread { Toast.makeText(this, "Backed up to Google Drive.", Toast.LENGTH_SHORT).show() }
+                      } catch (e: DriveBackup.NeedsConsent) {
+                          runOnUiThread { Toast.makeText(this, "Please sign in again to allow Drive access.", Toast.LENGTH_LONG).show() }
+                      } catch (e: Exception) {
+                          runOnUiThread { Toast.makeText(this, "Backup failed. Check your internet and try again.", Toast.LENGTH_LONG).show() }
+                      }
+                  }
+              }
+
+              private fun doRestore() {
+                  val email = account?.email
+                  if (email == null) { Toast.makeText(this, "Sign in first.", Toast.LENGTH_SHORT).show(); return }
+                  Toast.makeText(this, "Checking for a backup...", Toast.LENGTH_SHORT).show()
+                  io.execute {
+                      try {
+                          val json = DriveBackup.restore(this, email)
+                          runOnUiThread {
+                              if (json == null) {
+                                  Toast.makeText(this, "No backup found yet.", Toast.LENGTH_LONG).show()
+                              } else {
+                                  AlertDialog.Builder(this)
+                                      .setTitle("Restore backup?")
+                                      .setMessage("This replaces the cities and spots saved on this phone with your Google Drive backup.")
+                                      .setPositiveButton("Restore") { _, _ ->
+                                          if (Store.setRawData(this, json)) {
+                                              Toast.makeText(this, "Restored. Go back to see your spots.", Toast.LENGTH_LONG).show()
+                                          } else {
+                                              Toast.makeText(this, "That backup looked corrupted.", Toast.LENGTH_LONG).show()
+                                          }
+                                      }
+                                      .setNegativeButton("Cancel", null)
+                                      .show()
+                              }
+                          }
+                      } catch (e: DriveBackup.NeedsConsent) {
+                          runOnUiThread { Toast.makeText(this, "Please sign in again to allow Drive access.", Toast.LENGTH_LONG).show() }
+                      } catch (e: Exception) {
+                          runOnUiThread { Toast.makeText(this, "Restore failed. Check your internet and try again.", Toast.LENGTH_LONG).show() }
+                      }
+                  }
+              }
+
+              // ---------- Permissions ----------
+
+              private fun granted(p: String) =
+                  ContextCompat.checkSelfPermission(this, p) == PackageManager.PERMISSION_GRANTED
+
+              private fun hasLocation() = LocationChecker.hasLocationPermission(this)
+
+              private fun hasBackground() =
+                  Build.VERSION.SDK_INT < 29 || granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+
+              private fun hasNotif() =
+                  Build.VERSION.SDK_INT < 33 || granted(Manifest.permission.POST_NOTIFICATIONS)
+
+              private fun updatePermStatus() {
+                  val missing = mutableListOf<String>()
+                  if (!hasLocation()) missing.add("location")
+                  else if (!hasBackground()) missing.add("location \"Allow all the time\"")
+                  if (!hasNotif()) missing.add("notifications")
+                  permStatus.text = if (missing.isEmpty())
+                      "All set. Reminders can run in the background."
+                  else
+                      "Missing: " + missing.joinToString(" and ") + "."
+              }
+
+              private fun requestPermissions() {
+                  val need = mutableListOf<String>()
+                  if (!hasLocation()) {
+                      need.add(Manifest.permission.ACCESS_FINE_LOCATION)
+                      need.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+                  }
+                  if (!hasNotif()) need.add(Manifest.permission.POST_NOTIFICATIONS)
+                  if (need.isNotEmpty()) {
+                      permLauncher.launch(need.toTypedArray())
+                  } else if (!hasBackground()) {
+                      askBackground()
+                  }
+              }
+
+              private fun askBackground() {
+                  if (Build.VERSION.SDK_INT < 29 || hasBackground()) return
+                  AlertDialog.Builder(this)
+                      .setTitle("Allow location all the time")
+                      .setMessage(
+                          "To remind you when you arrive in a city, even when the app is closed, " +
+                              "set Location to \"Allow all the time\"."
+                      )
+                      .setPositiveButton("Continue") { _, _ ->
+                          if (Build.VERSION.SDK_INT >= 30) openAppSettings()
+                          else bgLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                      }
+                      .setNegativeButton("Not now", null)
+                      .show()
+              }
+
+              private fun openAppSettings() {
+                  startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+              }
+          }
+          SPOT_EOF_14
+          mkdir -p app/src/main/java/com/spotreminder/app
+          cat > app/src/main/java/com/spotreminder/app/Store.kt <<'SPOT_EOF_15'
           package com.spotreminder.app
 
           import android.content.Context
@@ -1658,44 +1798,71 @@ jobs:
                       false
                   }
               }
+
+              // Theme: "system" (default), "light", or "dark"
+              private const val KEY_THEME = "theme_mode"
+
+              fun themeMode(ctx: Context): String = prefs(ctx).getString(KEY_THEME, "system") ?: "system"
+
+              fun setThemeMode(ctx: Context, mode: String) {
+                  prefs(ctx).edit().putString(KEY_THEME, mode).apply()
+              }
           }
-          SPOT_EOF_13
+          SPOT_EOF_15
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_current.xml <<'SPOT_EOF_14'
+          cat > app/src/main/res/drawable/bg_avatar.xml <<'SPOT_EOF_16'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+              <solid android:color="@color/river" />
+          </shape>
+          SPOT_EOF_16
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/bg_current.xml <<'SPOT_EOF_17'
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
               <solid android:color="@color/paper" />
               <stroke android:width="2.5dp" android:color="@color/saffron" />
               <corners android:radius="18dp" />
           </shape>
-          SPOT_EOF_14
+          SPOT_EOF_17
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_paper.xml <<'SPOT_EOF_15'
+          cat > app/src/main/res/drawable/bg_paper.xml <<'SPOT_EOF_18'
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
               <solid android:color="@color/paper" />
               <stroke android:width="1.5dp" android:color="@color/line" />
               <corners android:radius="18dp" />
           </shape>
-          SPOT_EOF_15
+          SPOT_EOF_18
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_river.xml <<'SPOT_EOF_16'
+          cat > app/src/main/res/drawable/bg_river.xml <<'SPOT_EOF_19'
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
               <solid android:color="@color/river" />
               <corners android:radius="22dp" />
           </shape>
-          SPOT_EOF_16
+          SPOT_EOF_19
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_saffron.xml <<'SPOT_EOF_17'
+          cat > app/src/main/res/drawable/bg_saffron.xml <<'SPOT_EOF_20'
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
               <solid android:color="@color/saffron" />
               <corners android:radius="18dp" />
           </shape>
-          SPOT_EOF_17
+          SPOT_EOF_20
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_launcher_foreground.xml <<'SPOT_EOF_18'
+          cat > app/src/main/res/drawable/ic_back.xml <<'SPOT_EOF_21'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path
+                  android:fillColor="#8A9DA0"
+                  android:pathData="M20,11H7.83l5.59,-5.59L12,4l-8,8l8,8l1.41,-1.41L7.83,13H20V11z" />
+          </vector>
+          SPOT_EOF_21
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/ic_launcher_foreground.xml <<'SPOT_EOF_22'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="108dp" android:height="108dp"
@@ -1707,9 +1874,31 @@ jobs:
                   android:fillColor="#0F3B4C"
                   android:pathData="M54,41a7,7 0 1,0 0.01,0z" />
           </vector>
-          SPOT_EOF_18
+          SPOT_EOF_22
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_stat_pin.xml <<'SPOT_EOF_19'
+          cat > app/src/main/res/drawable/ic_person.xml <<'SPOT_EOF_23'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path
+                  android:fillColor="#FFFFFF"
+                  android:pathData="M12,12c2.21,0 4,-1.79 4,-4s-1.79,-4 -4,-4 -4,1.79 -4,4 1.79,4 4,4zM12,14c-2.67,0 -8,1.34 -8,4v2h16v-2c0,-2.66 -5.33,-4 -8,-4z" />
+          </vector>
+          SPOT_EOF_23
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/ic_settings.xml <<'SPOT_EOF_24'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path
+                  android:fillColor="#8A9DA0"
+                  android:pathData="M19.14,12.94c0.04,-0.3 0.06,-0.61 0.06,-0.94c0,-0.32 -0.02,-0.64 -0.07,-0.94l2.03,-1.58c0.18,-0.14 0.23,-0.41 0.12,-0.61l-1.92,-3.32c-0.12,-0.22 -0.37,-0.29 -0.59,-0.22l-2.39,0.96c-0.5,-0.38 -1.03,-0.7 -1.62,-0.94L14.4,2.81c-0.04,-0.24 -0.24,-0.41 -0.48,-0.41h-3.84c-0.24,0 -0.43,0.17 -0.47,0.41L9.25,5.35C8.66,5.59 8.12,5.92 7.63,6.29L5.24,5.33c-0.22,-0.08 -0.47,0 -0.59,0.22L2.74,8.87C2.62,9.08 2.66,9.34 2.86,9.48l2.03,1.58C4.84,11.36 4.8,11.69 4.8,12s0.02,0.64 0.07,0.94l-2.03,1.58c-0.18,0.14 -0.23,0.41 -0.12,0.61l1.92,3.32c0.12,0.22 0.37,0.29 0.59,0.22l2.39,-0.96c0.5,0.38 1.03,0.7 1.62,0.94l0.36,2.54c0.05,0.24 0.24,0.41 0.48,0.41h3.84c0.24,0 0.44,-0.17 0.47,-0.41l0.36,-2.54c0.59,-0.24 1.13,-0.56 1.62,-0.94l2.39,0.96c0.22,0.08 0.47,0 0.59,-0.22l1.92,-3.32c0.12,-0.22 0.07,-0.47 -0.12,-0.61L19.14,12.94zM12,15.6c-1.98,0 -3.6,-1.62 -3.6,-3.6s1.62,-3.6 3.6,-3.6s3.6,1.62 3.6,3.6S13.98,15.6 12,15.6z" />
+          </vector>
+          SPOT_EOF_24
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/ic_stat_pin.xml <<'SPOT_EOF_25'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
@@ -1718,9 +1907,9 @@ jobs:
                   android:fillColor="#FFFFFFFF"
                   android:pathData="M12,2a7,7 0 0,0 -7,7c0,5.2 7,13 7,13s7,-7.8 7,-13a7,7 0 0,0 -7,-7zM12,11.5a2.5,2.5 0 1,1 0,-5a2.5,2.5 0 0,1 0,5z" />
           </vector>
-          SPOT_EOF_19
+          SPOT_EOF_25
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_main.xml <<'SPOT_EOF_20'
+          cat > app/src/main/res/layout/activity_main.xml <<'SPOT_EOF_26'
           <?xml version="1.0" encoding="utf-8"?>
           <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
               xmlns:tools="http://schemas.android.com/tools"
@@ -1734,21 +1923,74 @@ jobs:
                   android:orientation="vertical"
                   android:padding="14dp">
 
-                  <TextView
-                      android:layout_width="wrap_content"
+                  <LinearLayout
+                      android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:text="Spot Reminder"
-                      android:textColor="@color/ink"
-                      android:textSize="24sp"
-                      android:textStyle="bold" />
+                      android:gravity="center_vertical"
+                      android:orientation="horizontal">
 
-                  <TextView
-                      android:layout_width="wrap_content"
+                      <LinearLayout
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:layout_weight="1"
+                          android:orientation="vertical">
+
+                          <TextView
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:text="Spot Reminder"
+                              android:textColor="@color/ink"
+                              android:textSize="24sp"
+                              android:textStyle="bold" />
+
+                          <TextView
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:layout_marginTop="2dp"
+                              android:text="Save the places you want to see. Get reminded when you arrive."
+                              android:textColor="@color/river_soft"
+                              android:textSize="13sp" />
+                      </LinearLayout>
+
+                      <ImageButton
+                          android:id="@+id/btnSettings"
+                          android:layout_width="44dp"
+                          android:layout_height="44dp"
+                          android:background="?attr/selectableItemBackgroundBorderless"
+                          android:contentDescription="Settings"
+                          android:padding="8dp"
+                          android:src="@drawable/ic_settings" />
+                  </LinearLayout>
+
+                  <!-- Permission nudge, only shown when something needs attention -->
+                  <LinearLayout
+                      android:id="@+id/nudge"
+                      android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:layout_marginTop="2dp"
-                      android:text="Save the places you want to see. Get reminded when you arrive."
-                      android:textColor="@color/river_soft"
-                      android:textSize="13sp" />
+                      android:layout_marginTop="8dp"
+                      android:background="@drawable/bg_current"
+                      android:gravity="center_vertical"
+                      android:orientation="horizontal"
+                      android:padding="10dp"
+                      android:visibility="gone">
+
+                      <TextView
+                          android:id="@+id/nudgeText"
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:layout_weight="1"
+                          android:textColor="@color/ink"
+                          android:textSize="13sp" />
+
+                      <com.google.android.material.button.MaterialButton
+                          android:id="@+id/btnNudgeFix"
+                          style="?attr/borderlessButtonStyle"
+                          android:layout_width="wrap_content"
+                          android:layout_height="36dp"
+                          android:text="Fix"
+                          android:textAllCaps="false"
+                          android:textSize="13sp" />
+                  </LinearLayout>
 
                   <!-- Where you are -->
                   <LinearLayout
@@ -1794,51 +2036,6 @@ jobs:
                           android:text="Check now"
                           android:textAllCaps="false"
                           android:textColor="@color/saffron" />
-                  </LinearLayout>
-
-                  <!-- Permissions -->
-                  <LinearLayout
-                      android:id="@+id/setupCard"
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:layout_marginTop="10dp"
-                      android:background="@drawable/bg_current"
-                      android:orientation="vertical"
-                      android:padding="12dp"
-                      android:visibility="gone">
-
-                      <TextView
-                          android:id="@+id/setupText"
-                          android:layout_width="match_parent"
-                          android:layout_height="wrap_content"
-                          android:textColor="@color/ink"
-                          android:textSize="13sp" />
-
-                      <LinearLayout
-                          android:layout_width="match_parent"
-                          android:layout_height="wrap_content"
-                          android:layout_marginTop="6dp"
-                          android:orientation="horizontal">
-
-                          <com.google.android.material.button.MaterialButton
-                              android:id="@+id/btnSetup"
-                              android:layout_width="wrap_content"
-                              android:layout_height="40dp"
-                              android:text="Turn on reminders"
-                              android:textAllCaps="false"
-                              android:textSize="13sp" />
-
-                          <com.google.android.material.button.MaterialButton
-                              android:id="@+id/btnSettings"
-                              style="?attr/borderlessButtonStyle"
-                              android:layout_width="wrap_content"
-                              android:layout_height="40dp"
-                              android:layout_marginStart="4dp"
-                              android:text="App settings"
-                              android:textAllCaps="false"
-                              android:textColor="@color/ink"
-                              android:textSize="13sp" />
-                      </LinearLayout>
                   </LinearLayout>
 
                   <!-- Arrival reminder -->
@@ -1974,124 +2171,13 @@ jobs:
                       android:id="@+id/savedList"
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
+                      android:layout_marginBottom="8dp"
                       android:orientation="vertical" />
-
-                  <!-- Backup to Google Drive -->
-                  <LinearLayout
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:layout_marginTop="16dp"
-                      android:background="@drawable/bg_paper"
-                      android:orientation="vertical"
-                      android:padding="12dp">
-
-                      <TextView
-                          android:layout_width="wrap_content"
-                          android:layout_height="wrap_content"
-                          android:text="Back up your data"
-                          android:textColor="@color/ink"
-                          android:textSize="16sp"
-                          android:textStyle="bold" />
-
-                      <TextView
-                          android:id="@+id/backupStatus"
-                          android:layout_width="match_parent"
-                          android:layout_height="wrap_content"
-                          android:layout_marginTop="2dp"
-                          android:text="Not signed in"
-                          android:textColor="@color/river_soft"
-                          android:textSize="13sp" />
-
-                      <LinearLayout
-                          android:layout_width="match_parent"
-                          android:layout_height="wrap_content"
-                          android:layout_marginTop="8dp"
-                          android:orientation="horizontal">
-
-                          <com.google.android.material.button.MaterialButton
-                              android:id="@+id/btnSignIn"
-                              android:layout_width="0dp"
-                              android:layout_height="42dp"
-                              android:layout_weight="1"
-                              android:text="Sign in with Google"
-                              android:textAllCaps="false"
-                              android:textSize="13sp" />
-
-                          <com.google.android.material.button.MaterialButton
-                              android:id="@+id/btnSignOut"
-                              style="?attr/materialButtonOutlinedStyle"
-                              android:layout_width="0dp"
-                              android:layout_height="42dp"
-                              android:layout_weight="1"
-                              android:text="Sign out"
-                              android:textAllCaps="false"
-                              android:textSize="13sp"
-                              android:visibility="gone" />
-                      </LinearLayout>
-
-                      <LinearLayout
-                          android:id="@+id/backupActions"
-                          android:layout_width="match_parent"
-                          android:layout_height="wrap_content"
-                          android:layout_marginTop="6dp"
-                          android:orientation="horizontal"
-                          android:visibility="gone">
-
-                          <com.google.android.material.button.MaterialButton
-                              android:id="@+id/btnBackupNow"
-                              style="?attr/materialButtonOutlinedStyle"
-                              android:layout_width="0dp"
-                              android:layout_height="42dp"
-                              android:layout_weight="1"
-                              android:text="Back up now"
-                              android:textAllCaps="false"
-                              android:textSize="13sp" />
-
-                          <com.google.android.material.button.MaterialButton
-                              android:id="@+id/btnRestore"
-                              style="?attr/materialButtonOutlinedStyle"
-                              android:layout_width="0dp"
-                              android:layout_height="42dp"
-                              android:layout_marginStart="6dp"
-                              android:layout_weight="1"
-                              android:text="Restore"
-                              android:textAllCaps="false"
-                              android:textSize="13sp" />
-                      </LinearLayout>
-                  </LinearLayout>
-
-                  <!-- Battery note -->
-                  <LinearLayout
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:layout_marginTop="16dp"
-                      android:background="@drawable/bg_paper"
-                      android:orientation="vertical"
-                      android:padding="12dp">
-
-                      <TextView
-                          android:layout_width="match_parent"
-                          android:layout_height="wrap_content"
-                          android:text="Checks run about every 15 minutes. If reminders come late, stop battery saving for this app."
-                          android:textColor="@color/river_soft"
-                          android:textSize="12sp" />
-
-                      <com.google.android.material.button.MaterialButton
-                          android:id="@+id/btnBattery"
-                          style="?attr/borderlessButtonStyle"
-                          android:layout_width="wrap_content"
-                          android:layout_height="36dp"
-                          android:layout_marginStart="-12dp"
-                          android:text="Battery settings"
-                          android:textAllCaps="false"
-                          android:textColor="@color/ink"
-                          android:textSize="13sp" />
-                  </LinearLayout>
               </LinearLayout>
           </ScrollView>
-          SPOT_EOF_20
+          SPOT_EOF_26
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_map.xml <<'SPOT_EOF_21'
+          cat > app/src/main/res/layout/activity_map.xml <<'SPOT_EOF_27'
           <?xml version="1.0" encoding="utf-8"?>
           <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
@@ -2194,17 +2280,305 @@ jobs:
                       android:textSize="15sp" />
               </LinearLayout>
           </FrameLayout>
-          SPOT_EOF_21
+          SPOT_EOF_27
+          mkdir -p app/src/main/res/layout
+          cat > app/src/main/res/layout/activity_settings.xml <<'SPOT_EOF_28'
+          <?xml version="1.0" encoding="utf-8"?>
+          <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:fillViewport="true">
+
+              <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:orientation="vertical"
+                  android:padding="14dp">
+
+                  <LinearLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:gravity="center_vertical"
+                      android:orientation="horizontal">
+
+                      <ImageButton
+                          android:id="@+id/btnBack"
+                          android:layout_width="40dp"
+                          android:layout_height="40dp"
+                          android:background="?attr/selectableItemBackgroundBorderless"
+                          android:contentDescription="Back"
+                          android:src="@drawable/ic_back" />
+
+                      <TextView
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:layout_marginStart="4dp"
+                          android:text="Settings"
+                          android:textColor="@color/ink"
+                          android:textSize="22sp"
+                          android:textStyle="bold" />
+                  </LinearLayout>
+
+                  <!-- Account -->
+                  <LinearLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="14dp"
+                      android:background="@drawable/bg_paper"
+                      android:orientation="vertical"
+                      android:padding="14dp">
+
+                      <TextView
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="Account"
+                          android:textColor="@color/ink"
+                          android:textSize="16sp"
+                          android:textStyle="bold" />
+
+                      <LinearLayout
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="10dp"
+                          android:gravity="center_vertical"
+                          android:orientation="horizontal">
+
+                          <ImageView
+                              android:id="@+id/avatar"
+                              android:layout_width="52dp"
+                              android:layout_height="52dp"
+                              android:background="@drawable/bg_avatar"
+                              android:contentDescription="Profile photo"
+                              android:padding="10dp"
+                              android:src="@drawable/ic_person" />
+
+                          <LinearLayout
+                              android:layout_width="0dp"
+                              android:layout_height="wrap_content"
+                              android:layout_marginStart="12dp"
+                              android:layout_weight="1"
+                              android:orientation="vertical">
+
+                              <TextView
+                                  android:id="@+id/profileName"
+                                  android:layout_width="match_parent"
+                                  android:layout_height="wrap_content"
+                                  android:text="Not signed in"
+                                  android:textColor="@color/ink"
+                                  android:textSize="16sp"
+                                  android:textStyle="bold" />
+
+                              <TextView
+                                  android:id="@+id/profileEmail"
+                                  android:layout_width="match_parent"
+                                  android:layout_height="wrap_content"
+                                  android:text="Sign in to back up your cities and spots"
+                                  android:textColor="@color/river_soft"
+                                  android:textSize="13sp" />
+                          </LinearLayout>
+                      </LinearLayout>
+
+                      <com.google.android.material.button.MaterialButton
+                          android:id="@+id/btnSignIn"
+                          android:layout_width="match_parent"
+                          android:layout_height="46dp"
+                          android:layout_marginTop="12dp"
+                          android:text="Sign in with Google"
+                          android:textAllCaps="false"
+                          android:textSize="14sp" />
+
+                      <com.google.android.material.button.MaterialButton
+                          android:id="@+id/btnSignOut"
+                          style="?attr/materialButtonOutlinedStyle"
+                          android:layout_width="match_parent"
+                          android:layout_height="42dp"
+                          android:layout_marginTop="10dp"
+                          android:text="Sign out"
+                          android:textAllCaps="false"
+                          android:textSize="13sp"
+                          android:visibility="gone" />
+
+                      <LinearLayout
+                          android:id="@+id/backupActions"
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="10dp"
+                          android:orientation="horizontal"
+                          android:visibility="gone">
+
+                          <com.google.android.material.button.MaterialButton
+                              android:id="@+id/btnBackupNow"
+                              style="?attr/materialButtonOutlinedStyle"
+                              android:layout_width="0dp"
+                              android:layout_height="42dp"
+                              android:layout_weight="1"
+                              android:text="Back up now"
+                              android:textAllCaps="false"
+                              android:textSize="13sp" />
+
+                          <com.google.android.material.button.MaterialButton
+                              android:id="@+id/btnRestore"
+                              style="?attr/materialButtonOutlinedStyle"
+                              android:layout_width="0dp"
+                              android:layout_height="42dp"
+                              android:layout_marginStart="6dp"
+                              android:layout_weight="1"
+                              android:text="Restore"
+                              android:textAllCaps="false"
+                              android:textSize="13sp" />
+                      </LinearLayout>
+                  </LinearLayout>
+
+                  <!-- Appearance -->
+                  <LinearLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="12dp"
+                      android:background="@drawable/bg_paper"
+                      android:orientation="vertical"
+                      android:padding="14dp">
+
+                      <TextView
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="Appearance"
+                          android:textColor="@color/ink"
+                          android:textSize="16sp"
+                          android:textStyle="bold" />
+
+                      <RadioGroup
+                          android:id="@+id/themeGroup"
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="6dp"
+                          android:orientation="vertical">
+
+                          <RadioButton
+                              android:id="@+id/themeSystem"
+                              android:layout_width="match_parent"
+                              android:layout_height="wrap_content"
+                              android:paddingTop="6dp"
+                              android:paddingBottom="6dp"
+                              android:text="System default"
+                              android:textColor="@color/ink"
+                              android:textSize="14sp" />
+
+                          <RadioButton
+                              android:id="@+id/themeLight"
+                              android:layout_width="match_parent"
+                              android:layout_height="wrap_content"
+                              android:paddingTop="6dp"
+                              android:paddingBottom="6dp"
+                              android:text="Light"
+                              android:textColor="@color/ink"
+                              android:textSize="14sp" />
+
+                          <RadioButton
+                              android:id="@+id/themeDark"
+                              android:layout_width="match_parent"
+                              android:layout_height="wrap_content"
+                              android:paddingTop="6dp"
+                              android:paddingBottom="6dp"
+                              android:text="Dark"
+                              android:textColor="@color/ink"
+                              android:textSize="14sp" />
+                      </RadioGroup>
+                  </LinearLayout>
+
+                  <!-- Reminders / permissions -->
+                  <LinearLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="12dp"
+                      android:background="@drawable/bg_paper"
+                      android:orientation="vertical"
+                      android:padding="14dp">
+
+                      <TextView
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="Reminders"
+                          android:textColor="@color/ink"
+                          android:textSize="16sp"
+                          android:textStyle="bold" />
+
+                      <TextView
+                          android:id="@+id/permStatus"
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="4dp"
+                          android:textColor="@color/river_soft"
+                          android:textSize="13sp" />
+
+                      <LinearLayout
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="10dp"
+                          android:orientation="horizontal">
+
+                          <com.google.android.material.button.MaterialButton
+                              android:id="@+id/btnGrant"
+                              android:layout_width="0dp"
+                              android:layout_height="42dp"
+                              android:layout_weight="1"
+                              android:text="Turn on reminders"
+                              android:textAllCaps="false"
+                              android:textSize="13sp" />
+
+                          <com.google.android.material.button.MaterialButton
+                              android:id="@+id/btnAppSettings"
+                              style="?attr/materialButtonOutlinedStyle"
+                              android:layout_width="0dp"
+                              android:layout_height="42dp"
+                              android:layout_marginStart="6dp"
+                              android:layout_weight="1"
+                              android:text="App settings"
+                              android:textAllCaps="false"
+                              android:textSize="13sp" />
+                      </LinearLayout>
+
+                      <TextView
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="10dp"
+                          android:text="Checks run about every 15 minutes. If reminders come late, stop battery saving for this app."
+                          android:textColor="@color/river_soft"
+                          android:textSize="12sp" />
+
+                      <com.google.android.material.button.MaterialButton
+                          android:id="@+id/btnBattery"
+                          style="?attr/borderlessButtonStyle"
+                          android:layout_width="wrap_content"
+                          android:layout_height="36dp"
+                          android:layout_marginStart="-12dp"
+                          android:text="Battery settings"
+                          android:textAllCaps="false"
+                          android:textColor="@color/ink"
+                          android:textSize="13sp" />
+                  </LinearLayout>
+
+                  <TextView
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:layout_gravity="center_horizontal"
+                      android:layout_marginTop="20dp"
+                      android:layout_marginBottom="8dp"
+                      android:text="Spot Reminder — version 1.1"
+                      android:textColor="@color/river_soft"
+                      android:textSize="12sp" />
+              </LinearLayout>
+          </ScrollView>
+          SPOT_EOF_28
           mkdir -p app/src/main/res/mipmap-anydpi-v26
-          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml <<'SPOT_EOF_22'
+          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml <<'SPOT_EOF_29'
           <?xml version="1.0" encoding="utf-8"?>
           <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
               <background android:drawable="@color/river" />
               <foreground android:drawable="@drawable/ic_launcher_foreground" />
           </adaptive-icon>
-          SPOT_EOF_22
+          SPOT_EOF_29
           mkdir -p app/src/main/res/values-night
-          cat > app/src/main/res/values-night/colors.xml <<'SPOT_EOF_23'
+          cat > app/src/main/res/values-night/colors.xml <<'SPOT_EOF_30'
           <resources>
               <color name="sea">#0E2126</color>
               <color name="sea_deep">#152E33</color>
@@ -2215,9 +2589,9 @@ jobs:
               <color name="brick">#FF7A6B</color>
               <color name="line">#2C4A50</color>
           </resources>
-          SPOT_EOF_23
+          SPOT_EOF_30
           mkdir -p app/src/main/res/values-night
-          cat > app/src/main/res/values-night/themes.xml <<'SPOT_EOF_24'
+          cat > app/src/main/res/values-night/themes.xml <<'SPOT_EOF_31'
           <resources>
               <style name="Theme.SpotReminder" parent="Theme.Material3.DayNight.NoActionBar">
                   <item name="colorPrimary">@color/river</item>
@@ -2229,9 +2603,9 @@ jobs:
                   <item name="android:windowLightStatusBar">false</item>
               </style>
           </resources>
-          SPOT_EOF_24
+          SPOT_EOF_31
           mkdir -p app/src/main/res/values
-          cat > app/src/main/res/values/colors.xml <<'SPOT_EOF_25'
+          cat > app/src/main/res/values/colors.xml <<'SPOT_EOF_32'
           <resources>
               <color name="sea">#E4F1EE</color>
               <color name="sea_deep">#CFE4DF</color>
@@ -2244,15 +2618,15 @@ jobs:
               <color name="brick">#B23A2E</color>
               <color name="line">#B9D3CD</color>
           </resources>
-          SPOT_EOF_25
+          SPOT_EOF_32
           mkdir -p app/src/main/res/values
-          cat > app/src/main/res/values/strings.xml <<'SPOT_EOF_26'
+          cat > app/src/main/res/values/strings.xml <<'SPOT_EOF_33'
           <resources>
               <string name="app_name">Spot Reminder</string>
           </resources>
-          SPOT_EOF_26
+          SPOT_EOF_33
           mkdir -p app/src/main/res/values
-          cat > app/src/main/res/values/themes.xml <<'SPOT_EOF_27'
+          cat > app/src/main/res/values/themes.xml <<'SPOT_EOF_34'
           <resources>
               <style name="Theme.SpotReminder" parent="Theme.Material3.DayNight.NoActionBar">
                   <item name="colorPrimary">@color/river</item>
@@ -2264,7 +2638,7 @@ jobs:
                   <item name="android:windowLightStatusBar">true</item>
               </style>
           </resources>
-          SPOT_EOF_27
+          SPOT_EOF_34
 
       - uses: actions/setup-java@v4
         with:
