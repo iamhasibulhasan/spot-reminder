@@ -75,11 +75,28 @@ jobs:
                       signingConfig = signingConfigs.getByName("debug")
                   }
               }
+              signingConfigs {
+                  getByName("debug") {
+                      // Fixed keystore (committed to the repo) so the SHA-1 fingerprint never changes
+                      // between builds. This is required for Google Sign-In / Drive backup to keep working.
+                      storeFile = file("debug.keystore")
+                      storePassword = "android"
+                      keyAlias = "androiddebugkey"
+                      keyPassword = "android"
+                  }
+              }
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
                   targetCompatibility = JavaVersion.VERSION_17
               }
               kotlinOptions { jvmTarget = "17" }
+
+              applicationVariants.all {
+                  outputs.all {
+                      val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+                      output.outputFileName = "spot-reminder.apk"
+                  }
+              }
           }
 
           dependencies {
@@ -89,10 +106,13 @@ jobs:
               implementation("androidx.constraintlayout:constraintlayout:2.1.4")
               implementation("androidx.work:work-runtime-ktx:2.9.1")
               implementation("org.osmdroid:osmdroid-android:6.1.18")
+              implementation("com.google.android.gms:play-services-auth:21.2.0")
           }
           SPOT_EOF_3
+          mkdir -p app
+          echo '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' | base64 -d > app/debug.keystore
           mkdir -p app/src/main
-          cat > app/src/main/AndroidManifest.xml <<'SPOT_EOF_4'
+          cat > app/src/main/AndroidManifest.xml <<'SPOT_EOF_5'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
@@ -125,9 +145,116 @@ jobs:
                       android:label="Pick a city" />
               </application>
           </manifest>
-          SPOT_EOF_4
+          SPOT_EOF_5
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/LocationChecker.kt <<'SPOT_EOF_5'
+          cat > app/src/main/java/com/spotreminder/app/DriveBackup.kt <<'SPOT_EOF_6'
+          package com.spotreminder.app
+
+          import android.content.Context
+          import com.google.android.gms.auth.GoogleAuthException
+          import com.google.android.gms.auth.GoogleAuthUtil
+          import org.json.JSONObject
+          import java.io.IOException
+          import java.net.HttpURLConnection
+          import java.net.URL
+          import java.net.URLEncoder
+
+          /**
+           * Backs the app's saved cities/spots up to a private file in the signed-in user's
+           * Google Drive "app data" folder (a hidden folder only this app can see, not visible
+           * in the user's normal Drive). Talks to the Drive v3 REST API directly, no extra
+           * Drive client library needed.
+           */
+          object DriveBackup {
+              private const val SCOPE = "oauth2:https://www.googleapis.com/auth/drive.appdata"
+              private const val FILE_NAME = "spot-reminder-backup.json"
+              private const val API = "https://www.googleapis.com/drive/v3/files"
+              private const val UPLOAD_API = "https://www.googleapis.com/upload/drive/v3/files"
+
+              class NeedsConsent(cause: Throwable) : Exception(cause)
+
+              /** Blocking. Call from a background thread. May throw NeedsConsent if the user must re-approve access. */
+              @Throws(IOException::class, NeedsConsent::class)
+              private fun token(ctx: Context, accountEmail: String): String {
+                  return try {
+                      GoogleAuthUtil.getToken(ctx, accountEmail, SCOPE)
+                  } catch (e: com.google.android.gms.auth.UserRecoverableAuthException) {
+                      throw NeedsConsent(e)
+                  } catch (e: GoogleAuthException) {
+                      throw IOException("Could not get permission from Google.", e)
+                  }
+              }
+
+              private fun findFileId(token: String): String? {
+                  val q = URLEncoder.encode("name='$FILE_NAME' and trashed=false", "UTF-8")
+                  val url = URL("$API?spaces=appDataFolder&q=$q&fields=files(id)")
+                  val c = url.openConnection() as HttpURLConnection
+                  c.setRequestProperty("Authorization", "Bearer $token")
+                  c.connectTimeout = 15000
+                  c.readTimeout = 15000
+                  if (c.responseCode !in 200..299) throw IOException("Drive lookup failed (${c.responseCode})")
+                  val body = c.inputStream.bufferedReader().use { it.readText() }
+                  val arr = JSONObject(body).optJSONArray("files") ?: return null
+                  return if (arr.length() > 0) arr.getJSONObject(0).getString("id") else null
+              }
+
+              /** Uploads the given JSON as the backup, replacing any previous backup. */
+              @Throws(IOException::class, NeedsConsent::class)
+              fun backup(ctx: Context, accountEmail: String, json: String) {
+                  val tok = token(ctx, accountEmail)
+                  val existingId = findFileId(tok)
+                  if (existingId != null) {
+                      val url = URL("$UPLOAD_API/$existingId?uploadType=media")
+                      val c = url.openConnection() as HttpURLConnection
+                      c.requestMethod = "PATCH"
+                      c.doOutput = true
+                      c.setRequestProperty("Authorization", "Bearer $tok")
+                      c.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                      c.outputStream.use { it.write(json.toByteArray(Charsets.UTF_8)) }
+                      if (c.responseCode !in 200..299) throw IOException("Backup update failed (${c.responseCode})")
+                  } else {
+                      val boundary = "spotreminder-${System.currentTimeMillis()}"
+                      val metadata = JSONObject().apply {
+                          put("name", FILE_NAME)
+                          put("parents", org.json.JSONArray().put("appDataFolder"))
+                      }
+                      val body = buildString {
+                          append("--$boundary\r\n")
+                          append("Content-Type: application/json; charset=UTF-8\r\n\r\n")
+                          append(metadata.toString())
+                          append("\r\n--$boundary\r\n")
+                          append("Content-Type: application/json; charset=UTF-8\r\n\r\n")
+                          append(json)
+                          append("\r\n--$boundary--")
+                      }
+                      val url = URL("$UPLOAD_API?uploadType=multipart")
+                      val c = url.openConnection() as HttpURLConnection
+                      c.requestMethod = "POST"
+                      c.doOutput = true
+                      c.setRequestProperty("Authorization", "Bearer $tok")
+                      c.setRequestProperty("Content-Type", "multipart/related; boundary=$boundary")
+                      c.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                      if (c.responseCode !in 200..299) throw IOException("Backup create failed (${c.responseCode})")
+                  }
+              }
+
+              /** Returns the saved backup JSON, or null if no backup exists yet. */
+              @Throws(IOException::class, NeedsConsent::class)
+              fun restore(ctx: Context, accountEmail: String): String? {
+                  val tok = token(ctx, accountEmail)
+                  val id = findFileId(tok) ?: return null
+                  val url = URL("$API/$id?alt=media")
+                  val c = url.openConnection() as HttpURLConnection
+                  c.setRequestProperty("Authorization", "Bearer $tok")
+                  c.connectTimeout = 15000
+                  c.readTimeout = 15000
+                  if (c.responseCode !in 200..299) throw IOException("Restore failed (${c.responseCode})")
+                  return c.inputStream.bufferedReader().use { it.readText() }
+              }
+          }
+          SPOT_EOF_6
+          mkdir -p app/src/main/java/com/spotreminder/app
+          cat > app/src/main/java/com/spotreminder/app/LocationChecker.kt <<'SPOT_EOF_7'
           package com.spotreminder.app
 
           import android.annotation.SuppressLint
@@ -301,9 +428,9 @@ jobs:
                   return out
               }
           }
-          SPOT_EOF_5
+          SPOT_EOF_7
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/LocationWorker.kt <<'SPOT_EOF_6'
+          cat > app/src/main/java/com/spotreminder/app/LocationWorker.kt <<'SPOT_EOF_8'
           package com.spotreminder.app
 
           import android.content.Context
@@ -319,9 +446,9 @@ jobs:
                   return Result.success()
               }
           }
-          SPOT_EOF_6
+          SPOT_EOF_8
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/MainActivity.kt <<'SPOT_EOF_7'
+          cat > app/src/main/java/com/spotreminder/app/MainActivity.kt <<'SPOT_EOF_9'
           package com.spotreminder.app
 
           import android.Manifest
@@ -331,12 +458,20 @@ jobs:
           import android.net.Uri
           import android.os.Build
           import android.os.Bundle
+          import android.os.Handler
+          import android.os.Looper
           import android.provider.Settings
+          import android.text.Editable
+          import android.text.TextWatcher
           import android.view.Gravity
           import android.view.View
+          import android.widget.ArrayAdapter
           import android.widget.CheckBox
+          import android.widget.Filter
+          import android.widget.FrameLayout
           import android.widget.LinearLayout
           import android.widget.TextView
+          import android.widget.Toast
           import androidx.activity.result.contract.ActivityResultContracts
           import androidx.appcompat.app.AlertDialog
           import androidx.appcompat.app.AppCompatActivity
@@ -344,6 +479,12 @@ jobs:
           import androidx.work.ExistingPeriodicWorkPolicy
           import androidx.work.PeriodicWorkRequestBuilder
           import androidx.work.WorkManager
+          import com.google.android.gms.auth.api.signin.GoogleSignIn
+          import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+          import com.google.android.gms.auth.api.signin.GoogleSignInClient
+          import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+          import com.google.android.gms.common.api.ApiException
+          import com.google.android.gms.common.api.Scope
           import com.google.android.material.button.MaterialButton
           import com.google.android.material.textfield.TextInputEditText
           import com.google.android.material.textfield.TextInputLayout
@@ -362,8 +503,8 @@ jobs:
               private lateinit var remindList: LinearLayout
               private lateinit var cityLayout: TextInputLayout
               private lateinit var spotLayout: TextInputLayout
-              private lateinit var cityInput: TextInputEditText
-              private lateinit var spotInput: TextInputEditText
+              private lateinit var cityInput: android.widget.AutoCompleteTextView
+              private lateinit var spotInput: android.widget.AutoCompleteTextView
               private lateinit var savedList: LinearLayout
 
               private val io = Executors.newSingleThreadExecutor()
@@ -371,6 +512,27 @@ jobs:
               private var lastNames: List<String> = emptyList()
               private var currentKey: String? = null
               private var dismissedKey: String? = null
+
+              // City/spot suggestions (free OpenStreetMap search, via Osm.kt)
+              private val mainHandler = Handler(Looper.getMainLooper())
+              private var citySuggestRunnable: Runnable? = null
+              private var spotSuggestRunnable: Runnable? = null
+              private var citySuggestions: List<Suggestion> = emptyList()
+              private var spotSuggestions: List<Suggestion> = emptyList()
+              private lateinit var cityAdapter: NoFilterAdapter
+              private lateinit var spotAdapter: NoFilterAdapter
+              private var suppressCityWatcher = false
+              private var suppressSpotWatcher = false
+              private var cityLat: Double? = null
+              private var cityLon: Double? = null
+
+              // Google sign-in + Drive backup
+              private lateinit var googleClient: GoogleSignInClient
+              private var account: GoogleSignInAccount? = null
+              private lateinit var backupStatus: TextView
+              private lateinit var btnSignIn: MaterialButton
+              private lateinit var btnSignOut: MaterialButton
+              private lateinit var backupActions: LinearLayout
 
               private val permLauncher =
                   registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
@@ -389,9 +551,27 @@ jobs:
                   registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
                       val name = r.data?.getStringExtra(MapPickerActivity.EXTRA_CITY)
                       if (r.resultCode == RESULT_OK && !name.isNullOrBlank()) {
+                          suppressCityWatcher = true
                           cityInput.setText(name)
+                          cityInput.dismissDropDown()
+                          suppressCityWatcher = false
                           cityLayout.error = null
+                          if (r.data?.hasExtra(MapPickerActivity.EXTRA_LAT) == true) {
+                              cityLat = r.data?.getDoubleExtra(MapPickerActivity.EXTRA_LAT, 0.0)
+                              cityLon = r.data?.getDoubleExtra(MapPickerActivity.EXTRA_LON, 0.0)
+                          }
                           spotInput.requestFocus()
+                      }
+                  }
+
+              private val signInLauncher =
+                  registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+                      val task = GoogleSignIn.getSignedInAccountFromIntent(r.data)
+                      try {
+                          account = task.getResult(ApiException::class.java)
+                          updateBackupUi()
+                      } catch (e: ApiException) {
+                          Toast.makeText(this, "Sign-in didn't complete (code ${e.statusCode}).", Toast.LENGTH_LONG).show()
                       }
                   }
 
@@ -412,6 +592,81 @@ jobs:
                   cityInput = findViewById(R.id.cityInput)
                   spotInput = findViewById(R.id.spotInput)
                   savedList = findViewById(R.id.savedList)
+                  backupStatus = findViewById(R.id.backupStatus)
+                  btnSignIn = findViewById(R.id.btnSignIn)
+                  btnSignOut = findViewById(R.id.btnSignOut)
+                  backupActions = findViewById(R.id.backupActions)
+
+                  val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                      .requestScopes(Scope("https://www.googleapis.com/auth/drive.appdata"))
+                      .build()
+                  googleClient = GoogleSignIn.getClient(this, gso)
+                  account = GoogleSignIn.getLastSignedInAccount(this)
+                  updateBackupUi()
+
+                  btnSignIn.setOnClickListener { signInLauncher.launch(googleClient.signInIntent) }
+                  btnSignOut.setOnClickListener {
+                      googleClient.signOut().addOnCompleteListener {
+                          account = null
+                          updateBackupUi()
+                      }
+                  }
+                  findViewById<View>(R.id.btnBackupNow).setOnClickListener { doBackup() }
+                  findViewById<View>(R.id.btnRestore).setOnClickListener { doRestore() }
+
+                  cityAdapter = NoFilterAdapter(this)
+                  spotAdapter = NoFilterAdapter(this)
+                  cityInput.setAdapter(cityAdapter)
+                  spotInput.setAdapter(spotAdapter)
+                  cityInput.threshold = 2
+                  spotInput.threshold = 2
+
+                  cityInput.setOnItemClickListener { _, _, position, _ ->
+                      val s = citySuggestions.getOrNull(position) ?: return@setOnItemClickListener
+                      cityLat = s.lat
+                      cityLon = s.lon
+                      suppressCityWatcher = true
+                      cityInput.setText(s.name)
+                      cityInput.setSelection(cityInput.text?.length ?: 0)
+                      cityInput.dismissDropDown()
+                      suppressCityWatcher = false
+                      cityLayout.error = null
+                  }
+                  spotInput.setOnItemClickListener { _, _, position, _ ->
+                      val s = spotSuggestions.getOrNull(position) ?: return@setOnItemClickListener
+                      suppressSpotWatcher = true
+                      spotInput.setText(s.name)
+                      spotInput.setSelection(spotInput.text?.length ?: 0)
+                      spotInput.dismissDropDown()
+                      suppressSpotWatcher = false
+                      spotLayout.error = null
+                  }
+
+                  cityInput.addTextChangedListener(object : TextWatcher {
+                      override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                      override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                      override fun afterTextChanged(s: Editable?) {
+                          if (suppressCityWatcher) return
+                          cityLat = null; cityLon = null
+                          val q = s?.toString().orEmpty()
+                          citySuggestRunnable?.let { mainHandler.removeCallbacks(it) }
+                          val r = Runnable { fetchCitySuggestions(q) }
+                          citySuggestRunnable = r
+                          mainHandler.postDelayed(r, 350)
+                      }
+                  })
+                  spotInput.addTextChangedListener(object : TextWatcher {
+                      override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                      override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                      override fun afterTextChanged(s: Editable?) {
+                          if (suppressSpotWatcher) return
+                          val q = s?.toString().orEmpty()
+                          spotSuggestRunnable?.let { mainHandler.removeCallbacks(it) }
+                          val r = Runnable { fetchSpotSuggestions(q) }
+                          spotSuggestRunnable = r
+                          mainHandler.postDelayed(r, 350)
+                      }
+                  })
 
                   findViewById<View>(R.id.btnCheck).setOnClickListener { onReady() }
                   findViewById<View>(R.id.btnSetup).setOnClickListener { requestSetup() }
@@ -593,6 +848,100 @@ jobs:
                   renderSaved()
               }
 
+              private fun fetchCitySuggestions(query: String) {
+                  if (query.trim().length < 2) return
+                  io.execute {
+                      val hits = Osm.suggestCities(query)
+                      runOnUiThread {
+                          if (cityInput.text?.toString() != query) return@runOnUiThread
+                          citySuggestions = hits
+                          cityAdapter.replaceAll(hits.map { it.label })
+                          if (hits.isNotEmpty() && cityInput.hasFocus()) cityInput.showDropDown()
+                      }
+                  }
+              }
+
+              private fun fetchSpotSuggestions(query: String) {
+                  if (query.trim().length < 2) return
+                  io.execute {
+                      val hits = Osm.suggestSpots(query, cityLat, cityLon)
+                      runOnUiThread {
+                          if (spotInput.text?.toString() != query) return@runOnUiThread
+                          spotSuggestions = hits
+                          spotAdapter.replaceAll(hits.map { it.label })
+                          if (hits.isNotEmpty() && spotInput.hasFocus()) spotInput.showDropDown()
+                      }
+                  }
+              }
+
+              private fun updateBackupUi() {
+                  val a = account
+                  if (a == null) {
+                      backupStatus.text = "Not signed in. Sign in to back up your cities and spots."
+                      btnSignIn.visibility = View.VISIBLE
+                      btnSignOut.visibility = View.GONE
+                      backupActions.visibility = View.GONE
+                  } else {
+                      backupStatus.text = "Signed in as " + (a.email ?: a.displayName ?: "your Google account")
+                      btnSignIn.visibility = View.GONE
+                      btnSignOut.visibility = View.VISIBLE
+                      backupActions.visibility = View.VISIBLE
+                  }
+              }
+
+              private fun doBackup() {
+                  val a = account?.email
+                  if (a == null) { Toast.makeText(this, "Sign in first.", Toast.LENGTH_SHORT).show(); return }
+                  val json = Store.rawData(this)
+                  Toast.makeText(this, "Backing up...", Toast.LENGTH_SHORT).show()
+                  io.execute {
+                      try {
+                          DriveBackup.backup(this, a, json)
+                          runOnUiThread { Toast.makeText(this, "Backed up to Google Drive.", Toast.LENGTH_SHORT).show() }
+                      } catch (e: DriveBackup.NeedsConsent) {
+                          runOnUiThread { Toast.makeText(this, "Please sign in again to allow Drive access.", Toast.LENGTH_LONG).show() }
+                      } catch (e: Exception) {
+                          runOnUiThread { Toast.makeText(this, "Backup failed. Check your internet and try again.", Toast.LENGTH_LONG).show() }
+                      }
+                  }
+              }
+
+              private fun doRestore() {
+                  val a = account?.email
+                  if (a == null) { Toast.makeText(this, "Sign in first.", Toast.LENGTH_SHORT).show(); return }
+                  Toast.makeText(this, "Checking for a backup...", Toast.LENGTH_SHORT).show()
+                  io.execute {
+                      try {
+                          val json = DriveBackup.restore(this, a)
+                          runOnUiThread {
+                              if (json == null) {
+                                  Toast.makeText(this, "No backup found yet.", Toast.LENGTH_LONG).show()
+                              } else {
+                                  AlertDialog.Builder(this)
+                                      .setTitle("Restore backup?")
+                                      .setMessage("This replaces the cities and spots saved on this phone with your Google Drive backup.")
+                                      .setPositiveButton("Restore") { _, _ ->
+                                          if (Store.setRawData(this, json)) {
+                                              recomputeMatch()
+                                              renderReminder()
+                                              renderSaved()
+                                              Toast.makeText(this, "Restored.", Toast.LENGTH_SHORT).show()
+                                          } else {
+                                              Toast.makeText(this, "That backup looked corrupted.", Toast.LENGTH_LONG).show()
+                                          }
+                                      }
+                                      .setNegativeButton("Cancel", null)
+                                      .show()
+                              }
+                          }
+                      } catch (e: DriveBackup.NeedsConsent) {
+                          runOnUiThread { Toast.makeText(this, "Please sign in again to allow Drive access.", Toast.LENGTH_LONG).show() }
+                      } catch (e: Exception) {
+                          runOnUiThread { Toast.makeText(this, "Restore failed. Check your internet and try again.", Toast.LENGTH_LONG).show() }
+                      }
+                  }
+              }
+
               private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
               private fun color(id: Int) = ContextCompat.getColor(this, id)
@@ -664,9 +1013,9 @@ jobs:
                       }
                       head.addView(TextView(this).apply {
                           text = c.name + if (here) "  (you are here)" else ""
-                          textSize = 18f
+                          textSize = 17f
                           setTypeface(typeface, Typeface.BOLD)
-                          setTextColor(color(R.color.river))
+                          setTextColor(color(R.color.ink))
                           layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                       })
                       head.addView(textButton("Remove city") {
@@ -690,13 +1039,15 @@ jobs:
                           val row = LinearLayout(this).apply {
                               orientation = LinearLayout.HORIZONTAL
                               gravity = Gravity.CENTER_VERTICAL
+                              setPadding(0, dp(4), 0, dp(4))
                           }
                           row.addView(TextView(this).apply {
                               text = s.name
-                              textSize = 16f
-                              setTextColor(color(R.color.river))
+                              textSize = 15f
+                              setTextColor(color(R.color.ink))
                               layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                           })
+                          row.addView(textButton("Edit") { showEditSpotDialog(c.key, s.name) })
                           row.addView(textButton("Delete") {
                               val all = Store.load(this)
                               val entry = all.firstOrNull { it.key == c.key }
@@ -712,10 +1063,45 @@ jobs:
                       savedList.addView(card)
                   }
               }
+
+              /** Shows a small dialog to rename a spot, keeping its done state. */
+              private fun showEditSpotDialog(cityKey: String, oldName: String) {
+                  val input = com.google.android.material.textfield.TextInputEditText(this).apply {
+                      setText(oldName)
+                      setSelection(text?.length ?: 0)
+                  }
+                  val wrap = FrameLayout(this).apply {
+                      val pad = dp(20)
+                      setPadding(pad, dp(8), pad, 0)
+                      addView(input)
+                  }
+                  AlertDialog.Builder(this)
+                      .setTitle("Edit spot name")
+                      .setView(wrap)
+                      .setPositiveButton("Save") { _, _ ->
+                          val newName = input.text?.toString()?.trim().orEmpty()
+                          if (newName.isEmpty()) return@setPositiveButton
+                          val all = Store.load(this)
+                          val entry = all.firstOrNull { it.key == cityKey } ?: return@setPositiveButton
+                          val spot = entry.spots.firstOrNull { it.name == oldName } ?: return@setPositiveButton
+                          val clash = entry.spots.any { it !== spot && Store.norm(it.name) == Store.norm(newName) }
+                          if (clash) {
+                              entry.spots.remove(spot)
+                          } else {
+                              spot.name = Store.titleCase(newName)
+                          }
+                          Store.save(this, all)
+                          recomputeMatch()
+                          renderReminder()
+                          renderSaved()
+                      }
+                      .setNegativeButton("Cancel", null)
+                      .show()
+              }
           }
-          SPOT_EOF_7
+          SPOT_EOF_9
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/MapPickerActivity.kt <<'SPOT_EOF_8'
+          cat > app/src/main/java/com/spotreminder/app/MapPickerActivity.kt <<'SPOT_EOF_10'
           package com.spotreminder.app
 
           import android.annotation.SuppressLint
@@ -723,12 +1109,16 @@ jobs:
           import android.content.Intent
           import android.location.LocationManager
           import android.os.Bundle
+          import android.os.Handler
+          import android.os.Looper
+          import android.text.Editable
+          import android.text.TextWatcher
           import android.view.inputmethod.EditorInfo
           import android.view.inputmethod.InputMethodManager
+          import android.widget.AutoCompleteTextView
           import android.widget.TextView
           import androidx.appcompat.app.AppCompatActivity
           import com.google.android.material.button.MaterialButton
-          import com.google.android.material.textfield.TextInputEditText
           import org.osmdroid.config.Configuration
           import org.osmdroid.events.MapEventsReceiver
           import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -739,21 +1129,31 @@ jobs:
           import java.io.File
           import java.util.concurrent.Executors
 
-          /** OpenStreetMap screen: search a city or tap the map, then return the city name. */
+          /** OpenStreetMap screen: search a city (with suggestions) or tap the map, then return the city name. */
           class MapPickerActivity : AppCompatActivity() {
 
               companion object {
                   const val EXTRA_CITY = "city"
+                  const val EXTRA_LAT = "lat"
+                  const val EXTRA_LON = "lon"
               }
 
               private lateinit var map: MapView
-              private lateinit var searchInput: TextInputEditText
+              private lateinit var searchInput: AutoCompleteTextView
               private lateinit var resultText: TextView
               private lateinit var btnUse: MaterialButton
+              private lateinit var searchAdapter: NoFilterAdapter
 
               private val io = Executors.newSingleThreadExecutor()
+              private val mainHandler = Handler(Looper.getMainLooper())
+              private var suggestRunnable: Runnable? = null
+              private var suggestions: List<Suggestion> = emptyList()
+              private var suppressWatcher = false
+
               private var marker: Marker? = null
               private var pickedName: String? = null
+              private var pickedLat: Double? = null
+              private var pickedLon: Double? = null
               private var requestId = 0
 
               override fun onCreate(savedInstanceState: Bundle?) {
@@ -793,6 +1193,37 @@ jobs:
                   }
                   map.overlays.add(0, MapEventsOverlay(receiver))
 
+                  searchAdapter = NoFilterAdapter(this)
+                  searchInput.setAdapter(searchAdapter)
+                  searchInput.threshold = 2
+                  searchInput.setOnItemClickListener { _, _, position, _ ->
+                      val s = suggestions.getOrNull(position) ?: return@setOnItemClickListener
+                      suppressWatcher = true
+                      searchInput.setText(s.name)
+                      searchInput.setSelection(searchInput.text?.length ?: 0)
+                      searchInput.dismissDropDown()
+                      suppressWatcher = false
+                      (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+                          .hideSoftInputFromWindow(searchInput.windowToken, 0)
+                      val p = GeoPoint(s.lat, s.lon)
+                      placeMarker(p)
+                      map.controller.setZoom(12.0)
+                      map.controller.animateTo(p)
+                      showResult(s.name, s.lat, s.lon)
+                  }
+                  searchInput.addTextChangedListener(object : TextWatcher {
+                      override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                      override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                      override fun afterTextChanged(s: Editable?) {
+                          if (suppressWatcher) return
+                          val q = s?.toString().orEmpty()
+                          suggestRunnable?.let { mainHandler.removeCallbacks(it) }
+                          val r = Runnable { fetchSuggestions(q) }
+                          suggestRunnable = r
+                          mainHandler.postDelayed(r, 350)
+                      }
+                  })
+
                   findViewById<MaterialButton>(R.id.btnSearch).setOnClickListener { doSearch() }
                   searchInput.setOnEditorActionListener { _, actionId, _ ->
                       if (actionId == EditorInfo.IME_ACTION_SEARCH) { doSearch(); true } else false
@@ -801,7 +1232,10 @@ jobs:
                   btnUse.setOnClickListener {
                       val name = pickedName
                       if (!name.isNullOrBlank()) {
-                          setResult(RESULT_OK, Intent().putExtra(EXTRA_CITY, name))
+                          val intent = Intent().putExtra(EXTRA_CITY, name)
+                          pickedLat?.let { intent.putExtra(EXTRA_LAT, it) }
+                          pickedLon?.let { intent.putExtra(EXTRA_LON, it) }
+                          setResult(RESULT_OK, intent)
                           finish()
                       }
                   }
@@ -853,17 +1287,23 @@ jobs:
 
               private fun showFinding() {
                   pickedName = null
+                  pickedLat = null
+                  pickedLon = null
                   btnUse.isEnabled = false
                   resultText.text = "Finding city name..."
               }
 
-              private fun showResult(name: String?) {
+              private fun showResult(name: String?, lat: Double? = null, lon: Double? = null) {
                   if (name.isNullOrBlank()) {
                       pickedName = null
+                      pickedLat = null
+                      pickedLon = null
                       btnUse.isEnabled = false
                       resultText.text = "No city found here. Tap a different spot or check your internet."
                   } else {
                       pickedName = name
+                      pickedLat = lat
+                      pickedLon = lon
                       btnUse.isEnabled = true
                       resultText.text = name
                   }
@@ -875,13 +1315,27 @@ jobs:
                   val id = ++requestId
                   io.execute {
                       val name = Osm.reverseCity(p.latitude, p.longitude)
-                      runOnUiThread { if (id == requestId) showResult(name) }
+                      runOnUiThread { if (id == requestId) showResult(name, p.latitude, p.longitude) }
+                  }
+              }
+
+              private fun fetchSuggestions(query: String) {
+                  if (query.trim().length < 2) return
+                  io.execute {
+                      val hits = Osm.suggestCities(query)
+                      runOnUiThread {
+                          if (searchInput.text?.toString() != query) return@runOnUiThread
+                          suggestions = hits
+                          searchAdapter.replaceAll(hits.map { it.label })
+                          if (hits.isNotEmpty() && searchInput.hasFocus()) searchInput.showDropDown()
+                      }
                   }
               }
 
               private fun doSearch() {
                   val q = searchInput.text?.toString()?.trim().orEmpty()
                   if (q.isEmpty()) return
+                  searchInput.dismissDropDown()
                   (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
                       .hideSoftInputFromWindow(searchInput.windowToken, 0)
                   showFinding()
@@ -899,15 +1353,15 @@ jobs:
                               placeMarker(p)
                               map.controller.setZoom(12.0)
                               map.controller.animateTo(p)
-                              showResult(hit.name)
+                              showResult(hit.name, hit.lat, hit.lon)
                           }
                       }
                   }
               }
           }
-          SPOT_EOF_8
+          SPOT_EOF_10
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/Notifier.kt <<'SPOT_EOF_9'
+          cat > app/src/main/java/com/spotreminder/app/Notifier.kt <<'SPOT_EOF_11'
           package com.spotreminder.app
 
           import android.Manifest
@@ -970,22 +1424,54 @@ jobs:
                   }
               }
           }
-          SPOT_EOF_9
+          SPOT_EOF_11
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/Osm.kt <<'SPOT_EOF_10'
+          cat > app/src/main/java/com/spotreminder/app/Osm.kt <<'SPOT_EOF_12'
           package com.spotreminder.app
 
+          import android.content.Context
+          import android.widget.ArrayAdapter
+          import android.widget.Filter
           import org.json.JSONArray
           import org.json.JSONObject
           import java.net.HttpURLConnection
           import java.net.URL
           import java.net.URLEncoder
 
+          /**
+           * An ArrayAdapter for autocomplete dropdowns whose items were already fetched from
+           * the network (server-side filtered), so it must not re-filter them itself.
+           */
+          class NoFilterAdapter(ctx: Context) :
+              ArrayAdapter<String>(ctx, android.R.layout.simple_dropdown_item_1line, mutableListOf()) {
+              private val passthrough = object : Filter() {
+                  override fun performFiltering(constraint: CharSequence?): FilterResults {
+                      val snapshot = (0 until count).map { getItem(it) }
+                      val r = FilterResults()
+                      r.values = snapshot
+                      r.count = snapshot.size
+                      return r
+                  }
+                  override fun publishResults(constraint: CharSequence?, results: FilterResults?) {}
+              }
+              override fun getFilter(): Filter = passthrough
+              fun replaceAll(items: List<String>) {
+                  setNotifyOnChange(false)
+                  clear()
+                  addAll(items)
+                  notifyDataSetChanged()
+              }
+          }
+
           data class SearchHit(val lat: Double, val lon: Double, val name: String)
 
-          /** Free OpenStreetMap search (Nominatim). No API key needed. */
+          /** One suggestion offered while typing: a label to show, and the coordinates behind it. */
+          data class Suggestion(val label: String, val name: String, val lat: Double, val lon: Double)
+
+          /** Free OpenStreetMap search (Nominatim for one-shot search/reverse, Photon for as-you-type). */
           object Osm {
               private const val BASE = "https://nominatim.openstreetmap.org"
+              private const val PHOTON = "https://photon.komoot.io/api/"
 
               private fun get(url: String): String {
                   val c = URL(url).openConnection() as HttpURLConnection
@@ -993,6 +1479,51 @@ jobs:
                   c.connectTimeout = 12000
                   c.readTimeout = 12000
                   return c.inputStream.bufferedReader().use { it.readText() }
+              }
+
+              /** City/town suggestions as the user types (Photon, free, supports search-as-you-type). */
+              fun suggestCities(query: String): List<Suggestion> {
+                  if (query.trim().length < 2) return emptyList()
+                  return try {
+                      val q = URLEncoder.encode(query, "UTF-8")
+                      parsePhoton(get("$PHOTON?q=$q&limit=6&lang=en"), placesOnly = true)
+                  } catch (e: Exception) {
+                      emptyList()
+                  }
+              }
+
+              /** Spot / point-of-interest suggestions, optionally biased near a chosen city. */
+              fun suggestSpots(query: String, nearLat: Double?, nearLon: Double?): List<Suggestion> {
+                  if (query.trim().length < 2) return emptyList()
+                  return try {
+                      val q = URLEncoder.encode(query, "UTF-8")
+                      var url = "$PHOTON?q=$q&limit=8&lang=en"
+                      if (nearLat != null && nearLon != null) url += "&lat=$nearLat&lon=$nearLon&location_bias_scale=0.9"
+                      parsePhoton(get(url), placesOnly = false)
+                  } catch (e: Exception) {
+                      emptyList()
+                  }
+              }
+
+              private fun parsePhoton(text: String, placesOnly: Boolean): List<Suggestion> {
+                  val out = mutableListOf<Suggestion>()
+                  val feats = JSONObject(text).optJSONArray("features") ?: return out
+                  for (i in 0 until feats.length()) {
+                      val f = feats.getJSONObject(i)
+                      val p = f.optJSONObject("properties") ?: continue
+                      val name = p.optString("name", "")
+                      if (name.isBlank()) continue
+                      if (placesOnly && p.optString("osm_key", "") != "place") continue
+                      val coords = f.optJSONObject("geometry")?.optJSONArray("coordinates") ?: continue
+                      val lon = coords.optDouble(0)
+                      val lat = coords.optDouble(1)
+                      val city = p.optString("city", "")
+                      val state = p.optString("state", "")
+                      val country = p.optString("country", "")
+                      val label = listOf(name, city, state, country).filter { it.isNotBlank() }.distinct().joinToString(", ")
+                      out.add(Suggestion(label, name, lat, lon))
+                  }
+                  return out
               }
 
               /** Picks the most city-like name from a Nominatim address object. */
@@ -1034,9 +1565,9 @@ jobs:
                   }
               }
           }
-          SPOT_EOF_10
+          SPOT_EOF_12
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/Store.kt <<'SPOT_EOF_11'
+          cat > app/src/main/java/com/spotreminder/app/Store.kt <<'SPOT_EOF_13'
           package com.spotreminder.app
 
           import android.content.Context
@@ -1044,7 +1575,7 @@ jobs:
           import org.json.JSONObject
           import java.text.Normalizer
 
-          data class Spot(val name: String, var done: Boolean = false)
+          data class Spot(var name: String, var done: Boolean = false)
           data class CityEntry(val key: String, val name: String, val spots: MutableList<Spot>)
 
           object Store {
@@ -1113,44 +1644,58 @@ jobs:
               fun setLastNotified(ctx: Context, key: String?) {
                   prefs(ctx).edit().putString(KEY_LAST, key).apply()
               }
+
+              /** The raw saved JSON, used for backup/restore. Never null; empty list if nothing saved. */
+              fun rawData(ctx: Context): String = prefs(ctx).getString(KEY_DATA, null) ?: "[]"
+
+              /** Overwrites all saved cities/spots from a backup. Validates the JSON before committing. */
+              fun setRawData(ctx: Context, json: String): Boolean {
+                  return try {
+                      JSONArray(json) // validate shape
+                      prefs(ctx).edit().putString(KEY_DATA, json).apply()
+                      true
+                  } catch (e: Exception) {
+                      false
+                  }
+              }
           }
-          SPOT_EOF_11
+          SPOT_EOF_13
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_current.xml <<'SPOT_EOF_12'
+          cat > app/src/main/res/drawable/bg_current.xml <<'SPOT_EOF_14'
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
               <solid android:color="@color/paper" />
               <stroke android:width="2.5dp" android:color="@color/saffron" />
               <corners android:radius="18dp" />
           </shape>
-          SPOT_EOF_12
+          SPOT_EOF_14
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_paper.xml <<'SPOT_EOF_13'
+          cat > app/src/main/res/drawable/bg_paper.xml <<'SPOT_EOF_15'
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
               <solid android:color="@color/paper" />
               <stroke android:width="1.5dp" android:color="@color/line" />
               <corners android:radius="18dp" />
           </shape>
-          SPOT_EOF_13
+          SPOT_EOF_15
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_river.xml <<'SPOT_EOF_14'
+          cat > app/src/main/res/drawable/bg_river.xml <<'SPOT_EOF_16'
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
               <solid android:color="@color/river" />
               <corners android:radius="22dp" />
           </shape>
-          SPOT_EOF_14
+          SPOT_EOF_16
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_saffron.xml <<'SPOT_EOF_15'
+          cat > app/src/main/res/drawable/bg_saffron.xml <<'SPOT_EOF_17'
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
               <solid android:color="@color/saffron" />
               <corners android:radius="18dp" />
           </shape>
-          SPOT_EOF_15
+          SPOT_EOF_17
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_launcher_foreground.xml <<'SPOT_EOF_16'
+          cat > app/src/main/res/drawable/ic_launcher_foreground.xml <<'SPOT_EOF_18'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="108dp" android:height="108dp"
@@ -1162,9 +1707,9 @@ jobs:
                   android:fillColor="#0F3B4C"
                   android:pathData="M54,41a7,7 0 1,0 0.01,0z" />
           </vector>
-          SPOT_EOF_16
+          SPOT_EOF_18
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_stat_pin.xml <<'SPOT_EOF_17'
+          cat > app/src/main/res/drawable/ic_stat_pin.xml <<'SPOT_EOF_19'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
@@ -1173,9 +1718,9 @@ jobs:
                   android:fillColor="#FFFFFFFF"
                   android:pathData="M12,2a7,7 0 0,0 -7,7c0,5.2 7,13 7,13s7,-7.8 7,-13a7,7 0 0,0 -7,-7zM12,11.5a2.5,2.5 0 1,1 0,-5a2.5,2.5 0 0,1 0,5z" />
           </vector>
-          SPOT_EOF_17
+          SPOT_EOF_19
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_main.xml <<'SPOT_EOF_18'
+          cat > app/src/main/res/layout/activity_main.xml <<'SPOT_EOF_20'
           <?xml version="1.0" encoding="utf-8"?>
           <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
               xmlns:tools="http://schemas.android.com/tools"
@@ -1187,14 +1732,14 @@ jobs:
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
                   android:orientation="vertical"
-                  android:padding="20dp">
+                  android:padding="14dp">
 
                   <TextView
                       android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
                       android:text="Spot Reminder"
-                      android:textColor="@color/river"
-                      android:textSize="30sp"
+                      android:textColor="@color/ink"
+                      android:textSize="24sp"
                       android:textStyle="bold" />
 
                   <TextView
@@ -1203,16 +1748,16 @@ jobs:
                       android:layout_marginTop="2dp"
                       android:text="Save the places you want to see. Get reminded when you arrive."
                       android:textColor="@color/river_soft"
-                      android:textSize="15sp" />
+                      android:textSize="13sp" />
 
                   <!-- Where you are -->
                   <LinearLayout
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:layout_marginTop="20dp"
+                      android:layout_marginTop="12dp"
                       android:background="@drawable/bg_river"
                       android:orientation="vertical"
-                      android:padding="18dp">
+                      android:padding="14dp">
 
                       <TextView
                           android:id="@+id/statusLabel"
@@ -1220,7 +1765,7 @@ jobs:
                           android:layout_height="wrap_content"
                           android:text="Finding your location"
                           android:textColor="@color/river_light"
-                          android:textSize="13sp" />
+                          android:textSize="12sp" />
 
                       <TextView
                           android:id="@+id/statusCity"
@@ -1228,24 +1773,24 @@ jobs:
                           android:layout_height="wrap_content"
                           android:text="Please wait"
                           android:textColor="@android:color/white"
-                          android:textSize="26sp"
+                          android:textSize="21sp"
                           android:textStyle="bold" />
 
                       <TextView
                           android:id="@+id/statusDetail"
                           android:layout_width="wrap_content"
                           android:layout_height="wrap_content"
-                          android:layout_marginTop="2dp"
+                          android:layout_marginTop="1dp"
                           android:textColor="@color/river_light"
-                          android:textSize="13sp" />
+                          android:textSize="12sp" />
 
                       <com.google.android.material.button.MaterialButton
                           android:id="@+id/btnCheck"
                           style="?attr/borderlessButtonStyle"
                           android:layout_width="wrap_content"
-                          android:layout_height="wrap_content"
+                          android:layout_height="36dp"
                           android:layout_marginStart="-12dp"
-                          android:layout_marginTop="4dp"
+                          android:layout_marginTop="2dp"
                           android:text="Check now"
                           android:textAllCaps="false"
                           android:textColor="@color/saffron" />
@@ -1256,41 +1801,43 @@ jobs:
                       android:id="@+id/setupCard"
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:layout_marginTop="14dp"
+                      android:layout_marginTop="10dp"
                       android:background="@drawable/bg_current"
                       android:orientation="vertical"
-                      android:padding="16dp"
+                      android:padding="12dp"
                       android:visibility="gone">
 
                       <TextView
                           android:id="@+id/setupText"
                           android:layout_width="match_parent"
                           android:layout_height="wrap_content"
-                          android:textColor="@color/river"
-                          android:textSize="15sp" />
+                          android:textColor="@color/ink"
+                          android:textSize="13sp" />
 
                       <LinearLayout
                           android:layout_width="match_parent"
                           android:layout_height="wrap_content"
-                          android:layout_marginTop="10dp"
+                          android:layout_marginTop="6dp"
                           android:orientation="horizontal">
 
                           <com.google.android.material.button.MaterialButton
                               android:id="@+id/btnSetup"
                               android:layout_width="wrap_content"
-                              android:layout_height="wrap_content"
+                              android:layout_height="40dp"
                               android:text="Turn on reminders"
-                              android:textAllCaps="false" />
+                              android:textAllCaps="false"
+                              android:textSize="13sp" />
 
                           <com.google.android.material.button.MaterialButton
                               android:id="@+id/btnSettings"
                               style="?attr/borderlessButtonStyle"
                               android:layout_width="wrap_content"
-                              android:layout_height="wrap_content"
-                              android:layout_marginStart="6dp"
+                              android:layout_height="40dp"
+                              android:layout_marginStart="4dp"
                               android:text="App settings"
                               android:textAllCaps="false"
-                              android:textColor="@color/river" />
+                              android:textColor="@color/ink"
+                              android:textSize="13sp" />
                       </LinearLayout>
                   </LinearLayout>
 
@@ -1299,10 +1846,10 @@ jobs:
                       android:id="@+id/remindCard"
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:layout_marginTop="14dp"
+                      android:layout_marginTop="10dp"
                       android:background="@drawable/bg_saffron"
                       android:orientation="vertical"
-                      android:padding="18dp"
+                      android:padding="14dp"
                       android:visibility="gone">
 
                       <TextView
@@ -1310,54 +1857,57 @@ jobs:
                           android:layout_width="match_parent"
                           android:layout_height="wrap_content"
                           android:textColor="@color/river"
-                          android:textSize="18sp"
+                          android:textSize="16sp"
                           android:textStyle="bold" />
 
                       <LinearLayout
                           android:id="@+id/remindList"
                           android:layout_width="match_parent"
                           android:layout_height="wrap_content"
-                          android:layout_marginTop="6dp"
+                          android:layout_marginTop="4dp"
                           android:orientation="vertical" />
 
                       <com.google.android.material.button.MaterialButton
                           android:id="@+id/btnGotIt"
                           android:layout_width="wrap_content"
-                          android:layout_height="wrap_content"
-                          android:layout_marginTop="8dp"
+                          android:layout_height="40dp"
+                          android:layout_marginTop="4dp"
                           android:text="Got it"
-                          android:textAllCaps="false" />
+                          android:textAllCaps="false"
+                          android:textSize="13sp" />
                   </LinearLayout>
 
                   <!-- Add spot -->
                   <LinearLayout
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:layout_marginTop="22dp"
+                      android:layout_marginTop="16dp"
                       android:background="@drawable/bg_paper"
                       android:orientation="vertical"
-                      android:padding="16dp">
+                      android:padding="12dp">
 
                       <TextView
                           android:layout_width="wrap_content"
                           android:layout_height="wrap_content"
                           android:text="Add a spot"
-                          android:textColor="@color/river"
-                          android:textSize="18sp"
+                          android:textColor="@color/ink"
+                          android:textSize="16sp"
                           android:textStyle="bold" />
 
                       <com.google.android.material.textfield.TextInputLayout
                           android:id="@+id/cityLayout"
-                          style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                          style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
                           android:layout_width="match_parent"
                           android:layout_height="wrap_content"
-                          android:layout_marginTop="10dp"
+                          android:layout_marginTop="8dp"
                           android:hint="City name (in English)">
 
-                          <com.google.android.material.textfield.TextInputEditText
+                          <android.widget.AutoCompleteTextView
                               android:id="@+id/cityInput"
                               android:layout_width="match_parent"
                               android:layout_height="wrap_content"
+                              android:completionThreshold="2"
+                              android:dropDownWidth="match_parent"
                               android:imeOptions="actionNext"
                               android:inputType="textCapWords"
                               android:singleLine="true" />
@@ -1367,23 +1917,26 @@ jobs:
                           android:id="@+id/btnMap"
                           style="?attr/materialButtonOutlinedStyle"
                           android:layout_width="match_parent"
-                          android:layout_height="wrap_content"
+                          android:layout_height="40dp"
                           android:layout_marginTop="4dp"
                           android:text="Pick city on map"
-                          android:textAllCaps="false" />
+                          android:textAllCaps="false"
+                          android:textSize="13sp" />
 
                       <com.google.android.material.textfield.TextInputLayout
                           android:id="@+id/spotLayout"
-                          style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                          style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
                           android:layout_width="match_parent"
                           android:layout_height="wrap_content"
-                          android:layout_marginTop="8dp"
+                          android:layout_marginTop="6dp"
                           android:hint="Spot name">
 
-                          <com.google.android.material.textfield.TextInputEditText
+                          <android.widget.AutoCompleteTextView
                               android:id="@+id/spotInput"
                               android:layout_width="match_parent"
                               android:layout_height="wrap_content"
+                              android:completionThreshold="2"
+                              android:dropDownWidth="match_parent"
                               android:imeOptions="actionDone"
                               android:inputType="textCapWords"
                               android:singleLine="true" />
@@ -1392,29 +1945,29 @@ jobs:
                       <com.google.android.material.button.MaterialButton
                           android:id="@+id/btnAdd"
                           android:layout_width="match_parent"
-                          android:layout_height="56dp"
-                          android:layout_marginTop="12dp"
+                          android:layout_height="46dp"
+                          android:layout_marginTop="8dp"
                           android:text="Save spot"
                           android:textAllCaps="false"
-                          android:textSize="16sp" />
+                          android:textSize="15sp" />
 
                       <TextView
                           android:layout_width="wrap_content"
                           android:layout_height="wrap_content"
-                          android:layout_marginTop="8dp"
-                          android:text="Add as many spots as you like for each city."
+                          android:layout_marginTop="6dp"
+                          android:text="Type a few letters for suggestions."
                           android:textColor="@color/river_soft"
-                          android:textSize="13sp" />
+                          android:textSize="12sp" />
                   </LinearLayout>
 
                   <!-- Saved -->
                   <TextView
                       android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
-                      android:layout_marginTop="26dp"
+                      android:layout_marginTop="18dp"
                       android:text="Your cities and spots"
-                      android:textColor="@color/river"
-                      android:textSize="18sp"
+                      android:textColor="@color/ink"
+                      android:textSize="16sp"
                       android:textStyle="bold" />
 
                   <LinearLayout
@@ -1423,37 +1976,122 @@ jobs:
                       android:layout_height="wrap_content"
                       android:orientation="vertical" />
 
+                  <!-- Backup to Google Drive -->
+                  <LinearLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="16dp"
+                      android:background="@drawable/bg_paper"
+                      android:orientation="vertical"
+                      android:padding="12dp">
+
+                      <TextView
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="Back up your data"
+                          android:textColor="@color/ink"
+                          android:textSize="16sp"
+                          android:textStyle="bold" />
+
+                      <TextView
+                          android:id="@+id/backupStatus"
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="2dp"
+                          android:text="Not signed in"
+                          android:textColor="@color/river_soft"
+                          android:textSize="13sp" />
+
+                      <LinearLayout
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="8dp"
+                          android:orientation="horizontal">
+
+                          <com.google.android.material.button.MaterialButton
+                              android:id="@+id/btnSignIn"
+                              android:layout_width="0dp"
+                              android:layout_height="42dp"
+                              android:layout_weight="1"
+                              android:text="Sign in with Google"
+                              android:textAllCaps="false"
+                              android:textSize="13sp" />
+
+                          <com.google.android.material.button.MaterialButton
+                              android:id="@+id/btnSignOut"
+                              style="?attr/materialButtonOutlinedStyle"
+                              android:layout_width="0dp"
+                              android:layout_height="42dp"
+                              android:layout_weight="1"
+                              android:text="Sign out"
+                              android:textAllCaps="false"
+                              android:textSize="13sp"
+                              android:visibility="gone" />
+                      </LinearLayout>
+
+                      <LinearLayout
+                          android:id="@+id/backupActions"
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="6dp"
+                          android:orientation="horizontal"
+                          android:visibility="gone">
+
+                          <com.google.android.material.button.MaterialButton
+                              android:id="@+id/btnBackupNow"
+                              style="?attr/materialButtonOutlinedStyle"
+                              android:layout_width="0dp"
+                              android:layout_height="42dp"
+                              android:layout_weight="1"
+                              android:text="Back up now"
+                              android:textAllCaps="false"
+                              android:textSize="13sp" />
+
+                          <com.google.android.material.button.MaterialButton
+                              android:id="@+id/btnRestore"
+                              style="?attr/materialButtonOutlinedStyle"
+                              android:layout_width="0dp"
+                              android:layout_height="42dp"
+                              android:layout_marginStart="6dp"
+                              android:layout_weight="1"
+                              android:text="Restore"
+                              android:textAllCaps="false"
+                              android:textSize="13sp" />
+                      </LinearLayout>
+                  </LinearLayout>
+
                   <!-- Battery note -->
                   <LinearLayout
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:layout_marginTop="24dp"
+                      android:layout_marginTop="16dp"
                       android:background="@drawable/bg_paper"
                       android:orientation="vertical"
-                      android:padding="14dp">
+                      android:padding="12dp">
 
                       <TextView
                           android:layout_width="match_parent"
                           android:layout_height="wrap_content"
-                          android:text="Android checks your location about every 15 minutes. If reminders come late, stop battery saving for this app."
+                          android:text="Checks run about every 15 minutes. If reminders come late, stop battery saving for this app."
                           android:textColor="@color/river_soft"
-                          android:textSize="13sp" />
+                          android:textSize="12sp" />
 
                       <com.google.android.material.button.MaterialButton
                           android:id="@+id/btnBattery"
                           style="?attr/borderlessButtonStyle"
                           android:layout_width="wrap_content"
-                          android:layout_height="wrap_content"
+                          android:layout_height="36dp"
                           android:layout_marginStart="-12dp"
                           android:text="Battery settings"
                           android:textAllCaps="false"
-                          android:textColor="@color/river" />
+                          android:textColor="@color/ink"
+                          android:textSize="13sp" />
                   </LinearLayout>
               </LinearLayout>
           </ScrollView>
-          SPOT_EOF_18
+          SPOT_EOF_20
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_map.xml <<'SPOT_EOF_19'
+          cat > app/src/main/res/layout/activity_map.xml <<'SPOT_EOF_21'
           <?xml version="1.0" encoding="utf-8"?>
           <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
@@ -1469,10 +2107,10 @@ jobs:
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
                   android:layout_gravity="top"
-                  android:layout_margin="12dp"
+                  android:layout_margin="10dp"
                   android:background="@drawable/bg_paper"
                   android:orientation="vertical"
-                  android:padding="10dp">
+                  android:padding="8dp">
 
                   <LinearLayout
                       android:layout_width="match_parent"
@@ -1481,16 +2119,18 @@ jobs:
                       android:orientation="horizontal">
 
                       <com.google.android.material.textfield.TextInputLayout
-                          style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                          style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
                           android:layout_width="0dp"
                           android:layout_height="wrap_content"
                           android:layout_weight="1"
                           android:hint="Search a city">
 
-                          <com.google.android.material.textfield.TextInputEditText
+                          <android.widget.AutoCompleteTextView
                               android:id="@+id/searchInput"
                               android:layout_width="match_parent"
                               android:layout_height="wrap_content"
+                              android:completionThreshold="2"
+                              android:dropDownWidth="match_parent"
                               android:imeOptions="actionSearch"
                               android:inputType="textCapWords"
                               android:singleLine="true" />
@@ -1499,19 +2139,20 @@ jobs:
                       <com.google.android.material.button.MaterialButton
                           android:id="@+id/btnSearch"
                           android:layout_width="wrap_content"
-                          android:layout_height="wrap_content"
-                          android:layout_marginStart="8dp"
+                          android:layout_height="40dp"
+                          android:layout_marginStart="6dp"
                           android:text="Search"
-                          android:textAllCaps="false" />
+                          android:textAllCaps="false"
+                          android:textSize="13sp" />
                   </LinearLayout>
 
                   <TextView
                       android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
-                      android:layout_marginTop="6dp"
-                      android:text="Or tap the map to pick a city."
+                      android:layout_marginTop="4dp"
+                      android:text="Type for suggestions, or tap the map."
                       android:textColor="@color/river_soft"
-                      android:textSize="13sp" />
+                      android:textSize="12sp" />
               </LinearLayout>
 
               <!-- Result -->
@@ -1519,17 +2160,17 @@ jobs:
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
                   android:layout_gravity="bottom"
-                  android:layout_margin="12dp"
+                  android:layout_margin="10dp"
                   android:background="@drawable/bg_river"
                   android:orientation="vertical"
-                  android:padding="16dp">
+                  android:padding="14dp">
 
                   <TextView
                       android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
                       android:text="Selected city"
                       android:textColor="@color/river_light"
-                      android:textSize="13sp" />
+                      android:textSize="12sp" />
 
                   <TextView
                       android:id="@+id/resultText"
@@ -1537,37 +2178,65 @@ jobs:
                       android:layout_height="wrap_content"
                       android:text="Nothing selected yet"
                       android:textColor="@android:color/white"
-                      android:textSize="22sp"
+                      android:textSize="19sp"
                       android:textStyle="bold" />
 
                   <com.google.android.material.button.MaterialButton
                       android:id="@+id/btnUse"
                       android:layout_width="match_parent"
-                      android:layout_height="56dp"
-                      android:layout_marginTop="10dp"
+                      android:layout_height="48dp"
+                      android:layout_marginTop="8dp"
                       android:backgroundTint="@color/saffron"
                       android:enabled="false"
                       android:text="Use this city"
                       android:textAllCaps="false"
                       android:textColor="@color/river"
-                      android:textSize="16sp" />
+                      android:textSize="15sp" />
               </LinearLayout>
           </FrameLayout>
-          SPOT_EOF_19
+          SPOT_EOF_21
           mkdir -p app/src/main/res/mipmap-anydpi-v26
-          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml <<'SPOT_EOF_20'
+          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml <<'SPOT_EOF_22'
           <?xml version="1.0" encoding="utf-8"?>
           <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
               <background android:drawable="@color/river" />
               <foreground android:drawable="@drawable/ic_launcher_foreground" />
           </adaptive-icon>
-          SPOT_EOF_20
+          SPOT_EOF_22
+          mkdir -p app/src/main/res/values-night
+          cat > app/src/main/res/values-night/colors.xml <<'SPOT_EOF_23'
+          <resources>
+              <color name="sea">#0E2126</color>
+              <color name="sea_deep">#152E33</color>
+              <color name="ink">#EAF4F1</color>
+              <color name="river_soft">#A9C4C9</color>
+              <color name="saffron">#F2A516</color>
+              <color name="paper">#162C32</color>
+              <color name="brick">#FF7A6B</color>
+              <color name="line">#2C4A50</color>
+          </resources>
+          SPOT_EOF_23
+          mkdir -p app/src/main/res/values-night
+          cat > app/src/main/res/values-night/themes.xml <<'SPOT_EOF_24'
+          <resources>
+              <style name="Theme.SpotReminder" parent="Theme.Material3.DayNight.NoActionBar">
+                  <item name="colorPrimary">@color/river</item>
+                  <item name="colorOnPrimary">@color/sea</item>
+                  <item name="colorSecondary">@color/saffron</item>
+                  <item name="android:windowBackground">@color/sea</item>
+                  <item name="android:statusBarColor">@color/sea</item>
+                  <item name="android:navigationBarColor">@color/sea</item>
+                  <item name="android:windowLightStatusBar">false</item>
+              </style>
+          </resources>
+          SPOT_EOF_24
           mkdir -p app/src/main/res/values
-          cat > app/src/main/res/values/colors.xml <<'SPOT_EOF_21'
+          cat > app/src/main/res/values/colors.xml <<'SPOT_EOF_25'
           <resources>
               <color name="sea">#E4F1EE</color>
               <color name="sea_deep">#CFE4DF</color>
               <color name="river">#0F3B4C</color>
+              <color name="ink">#0F3B4C</color>
               <color name="river_soft">#3F6572</color>
               <color name="river_light">#B8D7DF</color>
               <color name="saffron">#F2A516</color>
@@ -1575,17 +2244,17 @@ jobs:
               <color name="brick">#B23A2E</color>
               <color name="line">#B9D3CD</color>
           </resources>
-          SPOT_EOF_21
+          SPOT_EOF_25
           mkdir -p app/src/main/res/values
-          cat > app/src/main/res/values/strings.xml <<'SPOT_EOF_22'
+          cat > app/src/main/res/values/strings.xml <<'SPOT_EOF_26'
           <resources>
               <string name="app_name">Spot Reminder</string>
           </resources>
-          SPOT_EOF_22
+          SPOT_EOF_26
           mkdir -p app/src/main/res/values
-          cat > app/src/main/res/values/themes.xml <<'SPOT_EOF_23'
+          cat > app/src/main/res/values/themes.xml <<'SPOT_EOF_27'
           <resources>
-              <style name="Theme.SpotReminder" parent="Theme.Material3.Light.NoActionBar">
+              <style name="Theme.SpotReminder" parent="Theme.Material3.DayNight.NoActionBar">
                   <item name="colorPrimary">@color/river</item>
                   <item name="colorOnPrimary">@android:color/white</item>
                   <item name="colorSecondary">@color/saffron</item>
@@ -1595,7 +2264,7 @@ jobs:
                   <item name="android:windowLightStatusBar">true</item>
               </style>
           </resources>
-          SPOT_EOF_23
+          SPOT_EOF_27
 
       - uses: actions/setup-java@v4
         with:
@@ -1617,11 +2286,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SpotReminder-apk
-          path: proj/app/build/outputs/apk/debug/app-debug.apk
+          path: proj/app/build/outputs/apk/debug/spot-reminder.apk
 
       - name: Publish APK to Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
           name: Spot Reminder build ${{ github.run_number }}
-          files: proj/app/build/outputs/apk/debug/app-debug.apk
+          files: proj/app/build/outputs/apk/debug/spot-reminder.apk
