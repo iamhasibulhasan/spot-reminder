@@ -914,10 +914,17 @@ jobs:
                       setText(oldName)
                       setSelection(text?.length ?: 0)
                   }
+                  val til = com.google.android.material.textfield.TextInputLayout(this).apply {
+                      boxBackgroundMode = com.google.android.material.textfield.TextInputLayout.BOX_BACKGROUND_FILLED
+                      setBoxCornerRadii(dp(14).toFloat(), dp(14).toFloat(), dp(14).toFloat(), dp(14).toFloat())
+                      setBoxBackgroundColorResource(R.color.field)
+                      hint = "Spot name"
+                      addView(input)
+                  }
                   val wrap = FrameLayout(this).apply {
                       val pad = dp(20)
                       setPadding(pad, dp(8), pad, 0)
-                      addView(input)
+                      addView(til)
                   }
                   AlertDialog.Builder(this)
                       .setTitle("Edit spot name")
@@ -1444,6 +1451,7 @@ jobs:
           import com.google.android.gms.common.api.ApiException
           import com.google.android.gms.common.api.Scope
           import com.google.android.material.button.MaterialButton
+          import com.google.android.material.textfield.TextInputEditText
           import java.net.URL
           import java.util.concurrent.Executors
 
@@ -1517,6 +1525,23 @@ jobs:
                   }
                   findViewById<View>(R.id.btnBackupNow).setOnClickListener { doBackup() }
                   findViewById<View>(R.id.btnRestore).setOnClickListener { doRestore() }
+
+                  // Local profile (name/phone/address), separate from the Google account
+                  val nameInput = findViewById<TextInputEditText>(R.id.profileNameInput)
+                  val phoneInput = findViewById<TextInputEditText>(R.id.profilePhoneInput)
+                  val addressInput = findViewById<TextInputEditText>(R.id.profileAddressInput)
+                  nameInput.setText(Store.profileName(this))
+                  phoneInput.setText(Store.profilePhone(this))
+                  addressInput.setText(Store.profileAddress(this))
+                  findViewById<View>(R.id.btnSaveProfile).setOnClickListener {
+                      Store.saveProfile(
+                          this,
+                          nameInput.text?.toString()?.trim().orEmpty(),
+                          phoneInput.text?.toString()?.trim().orEmpty(),
+                          addressInput.text?.toString()?.trim().orEmpty()
+                      )
+                      Toast.makeText(this, "Profile saved.", Toast.LENGTH_SHORT).show()
+                  }
 
                   // Theme
                   when (Store.themeMode(this)) {
@@ -1807,6 +1832,23 @@ jobs:
               fun setThemeMode(ctx: Context, mode: String) {
                   prefs(ctx).edit().putString(KEY_THEME, mode).apply()
               }
+
+              // Editable local profile (separate from the Google account used for backup)
+              private const val KEY_PROFILE_NAME = "profile_name"
+              private const val KEY_PROFILE_PHONE = "profile_phone"
+              private const val KEY_PROFILE_ADDRESS = "profile_address"
+
+              fun profileName(ctx: Context): String = prefs(ctx).getString(KEY_PROFILE_NAME, "") ?: ""
+              fun profilePhone(ctx: Context): String = prefs(ctx).getString(KEY_PROFILE_PHONE, "") ?: ""
+              fun profileAddress(ctx: Context): String = prefs(ctx).getString(KEY_PROFILE_ADDRESS, "") ?: ""
+
+              fun saveProfile(ctx: Context, name: String, phone: String, address: String) {
+                  prefs(ctx).edit()
+                      .putString(KEY_PROFILE_NAME, name)
+                      .putString(KEY_PROFILE_PHONE, phone)
+                      .putString(KEY_PROFILE_ADDRESS, address)
+                      .apply()
+              }
           }
           SPOT_EOF_15
           mkdir -p app/src/main/res/drawable
@@ -2093,7 +2135,7 @@ jobs:
 
                       <com.google.android.material.textfield.TextInputLayout
                           android:id="@+id/cityLayout"
-                          style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+                          style="@style/Widget.SpotReminder.TextField"
                           android:layout_width="match_parent"
                           android:layout_height="wrap_content"
                           android:layout_marginTop="8dp"
@@ -2122,7 +2164,7 @@ jobs:
 
                       <com.google.android.material.textfield.TextInputLayout
                           android:id="@+id/spotLayout"
-                          style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+                          style="@style/Widget.SpotReminder.TextField"
                           android:layout_width="match_parent"
                           android:layout_height="wrap_content"
                           android:layout_marginTop="6dp"
@@ -2205,7 +2247,7 @@ jobs:
                       android:orientation="horizontal">
 
                       <com.google.android.material.textfield.TextInputLayout
-                          style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+                          style="@style/Widget.SpotReminder.TextField"
                           android:layout_width="0dp"
                           android:layout_height="wrap_content"
                           android:layout_weight="1"
@@ -2429,6 +2471,89 @@ jobs:
                       </LinearLayout>
                   </LinearLayout>
 
+                  <!-- Your profile (local, separate from the Google account) -->
+                  <LinearLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="12dp"
+                      android:background="@drawable/bg_paper"
+                      android:orientation="vertical"
+                      android:padding="14dp">
+
+                      <TextView
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="Your profile"
+                          android:textColor="@color/ink"
+                          android:textSize="16sp"
+                          android:textStyle="bold" />
+
+                      <TextView
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="2dp"
+                          android:text="Kept on this phone only."
+                          android:textColor="@color/river_soft"
+                          android:textSize="12sp" />
+
+                      <com.google.android.material.textfield.TextInputLayout
+                          style="@style/Widget.SpotReminder.TextField"
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="10dp"
+                          android:hint="Full name">
+
+                          <com.google.android.material.textfield.TextInputEditText
+                              android:id="@+id/profileNameInput"
+                              android:layout_width="match_parent"
+                              android:layout_height="wrap_content"
+                              android:imeOptions="actionNext"
+                              android:inputType="textPersonName|textCapWords"
+                              android:singleLine="true" />
+                      </com.google.android.material.textfield.TextInputLayout>
+
+                      <com.google.android.material.textfield.TextInputLayout
+                          style="@style/Widget.SpotReminder.TextField"
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="8dp"
+                          android:hint="Phone number">
+
+                          <com.google.android.material.textfield.TextInputEditText
+                              android:id="@+id/profilePhoneInput"
+                              android:layout_width="match_parent"
+                              android:layout_height="wrap_content"
+                              android:imeOptions="actionNext"
+                              android:inputType="phone"
+                              android:singleLine="true" />
+                      </com.google.android.material.textfield.TextInputLayout>
+
+                      <com.google.android.material.textfield.TextInputLayout
+                          style="@style/Widget.SpotReminder.TextField"
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="8dp"
+                          android:hint="Address">
+
+                          <com.google.android.material.textfield.TextInputEditText
+                              android:id="@+id/profileAddressInput"
+                              android:layout_width="match_parent"
+                              android:layout_height="wrap_content"
+                              android:imeOptions="actionDone"
+                              android:inputType="textPostalAddress|textCapSentences"
+                              android:maxLines="3" />
+                      </com.google.android.material.textfield.TextInputLayout>
+
+                      <com.google.android.material.button.MaterialButton
+                          android:id="@+id/btnSaveProfile"
+                          android:layout_width="match_parent"
+                          android:layout_height="46dp"
+                          android:layout_marginTop="10dp"
+                          android:text="Save profile"
+                          android:textAllCaps="false"
+                          android:textSize="14sp" />
+                  </LinearLayout>
+
                   <!-- Appearance -->
                   <LinearLayout
                       android:layout_width="match_parent"
@@ -2580,14 +2705,20 @@ jobs:
           mkdir -p app/src/main/res/values-night
           cat > app/src/main/res/values-night/colors.xml <<'SPOT_EOF_30'
           <resources>
-              <color name="sea">#0E2126</color>
-              <color name="sea_deep">#152E33</color>
-              <color name="ink">#EAF4F1</color>
-              <color name="river_soft">#A9C4C9</color>
+              <!-- A layered dark palette: background darkest, cards a step lighter, fields a step
+                   lighter again, so surfaces read as distinct instead of blending together. -->
+              <color name="sea">#0B171C</color>
+              <color name="sea_deep">#101F25</color>
+              <color name="river">#1B5068</color>
+              <color name="ink">#ECF2F1</color>
+              <color name="river_soft">#9FB4B9</color>
+              <color name="river_light">#BFE0E8</color>
               <color name="saffron">#F2A516</color>
-              <color name="paper">#162C32</color>
-              <color name="brick">#FF7A6B</color>
-              <color name="line">#2C4A50</color>
+              <color name="paper">#142229</color>
+              <color name="field">#1C2E36</color>
+              <color name="field_stroke">#33505A</color>
+              <color name="brick">#FF8A75</color>
+              <color name="line">#243740</color>
           </resources>
           SPOT_EOF_30
           mkdir -p app/src/main/res/values-night
@@ -2615,6 +2746,8 @@ jobs:
               <color name="river_light">#B8D7DF</color>
               <color name="saffron">#F2A516</color>
               <color name="paper">#FBFDFC</color>
+              <color name="field">#EAF4F1</color>
+              <color name="field_stroke">#A9CCC5</color>
               <color name="brick">#B23A2E</color>
               <color name="line">#B9D3CD</color>
           </resources>
@@ -2626,7 +2759,26 @@ jobs:
           </resources>
           SPOT_EOF_33
           mkdir -p app/src/main/res/values
-          cat > app/src/main/res/values/themes.xml <<'SPOT_EOF_34'
+          cat > app/src/main/res/values/styles.xml <<'SPOT_EOF_34'
+          <resources>
+              <style name="ShapeAppearanceOverlay.SpotReminder.TextField" parent="">
+                  <item name="cornerFamily">rounded</item>
+                  <item name="cornerSize">14dp</item>
+              </style>
+
+              <style name="Widget.SpotReminder.TextField" parent="Widget.Material3.TextInputLayout.FilledBox.Dense">
+                  <item name="shapeAppearanceOverlay">@style/ShapeAppearanceOverlay.SpotReminder.TextField</item>
+                  <item name="boxBackgroundColor">@color/field</item>
+                  <item name="boxStrokeColor">@color/river</item>
+                  <item name="boxStrokeWidthFocused">1.5dp</item>
+                  <item name="hintTextColor">@color/river_soft</item>
+                  <item name="android:textColorHint">@color/river_soft</item>
+                  <item name="colorControlNormal">@color/field_stroke</item>
+              </style>
+          </resources>
+          SPOT_EOF_34
+          mkdir -p app/src/main/res/values
+          cat > app/src/main/res/values/themes.xml <<'SPOT_EOF_35'
           <resources>
               <style name="Theme.SpotReminder" parent="Theme.Material3.DayNight.NoActionBar">
                   <item name="colorPrimary">@color/river</item>
@@ -2638,7 +2790,7 @@ jobs:
                   <item name="android:windowLightStatusBar">true</item>
               </style>
           </resources>
-          SPOT_EOF_34
+          SPOT_EOF_35
 
       - uses: actions/setup-java@v4
         with:
