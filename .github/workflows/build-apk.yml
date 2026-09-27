@@ -594,7 +594,6 @@ jobs:
           import androidx.work.WorkManager
           import com.google.android.material.button.MaterialButton
           import com.google.android.material.textfield.TextInputEditText
-          import com.google.android.material.textfield.TextInputLayout
           import java.util.concurrent.Executors
           import java.util.concurrent.TimeUnit
 
@@ -608,8 +607,8 @@ jobs:
               private lateinit var remindCard: LinearLayout
               private lateinit var remindTitle: TextView
               private lateinit var remindList: LinearLayout
-              private lateinit var cityLayout: TextInputLayout
-              private lateinit var spotLayout: TextInputLayout
+              private lateinit var cityLayout: LinearLayout
+              private lateinit var spotLayout: LinearLayout
               private lateinit var cityInput: android.widget.AutoCompleteTextView
               private lateinit var spotInput: android.widget.AutoCompleteTextView
 
@@ -640,7 +639,6 @@ jobs:
                           cityInput.setText(name)
                           cityInput.dismissDropDown()
                           suppressCityWatcher = false
-                          cityLayout.error = null
                           if (r.data?.hasExtra(MapPickerActivity.EXTRA_LAT) == true) {
                               cityLat = r.data?.getDoubleExtra(MapPickerActivity.EXTRA_LAT, 0.0)
                               cityLon = r.data?.getDoubleExtra(MapPickerActivity.EXTRA_LON, 0.0)
@@ -684,7 +682,6 @@ jobs:
                       cityInput.setSelection(cityInput.text?.length ?: 0)
                       cityInput.dismissDropDown()
                       suppressCityWatcher = false
-                      cityLayout.error = null
                   }
                   spotInput.setOnItemClickListener { _, _, position, _ ->
                       val s = spotSuggestions.getOrNull(position) ?: return@setOnItemClickListener
@@ -693,7 +690,6 @@ jobs:
                       spotInput.setSelection(spotInput.text?.length ?: 0)
                       spotInput.dismissDropDown()
                       suppressSpotWatcher = false
-                      spotLayout.error = null
                   }
 
                   cityInput.addTextChangedListener(object : TextWatcher {
@@ -825,12 +821,10 @@ jobs:
               private fun addSpot() {
                   val city = cityInput.text?.toString()?.trim().orEmpty()
                   val spot = spotInput.text?.toString()?.trim().orEmpty()
-                  cityLayout.error = null
-                  spotLayout.error = null
-                  if (city.isEmpty()) { cityLayout.error = "Enter a city name"; return }
-                  if (spot.isEmpty()) { spotLayout.error = "Enter a spot name"; return }
+                  if (city.isEmpty()) { toast("Enter a city name"); return }
+                  if (spot.isEmpty()) { toast("Enter a spot name"); return }
                   val key = Store.norm(city)
-                  if (key.isEmpty()) { cityLayout.error = "Use letters or numbers"; return }
+                  if (key.isEmpty()) { toast("Use letters or numbers for the city"); return }
 
                   val list = Store.load(this)
                   val entry = list.firstOrNull { it.key == key }
@@ -876,6 +870,9 @@ jobs:
               private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
               private fun color(id: Int) = ContextCompat.getColor(this, id)
+
+              private fun toast(msg: String) =
+                  android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_SHORT).show()
 
               private fun renderReminder() {
                   val key = currentKey
@@ -1866,11 +1863,14 @@ jobs:
           package com.spotreminder.app
 
           import android.content.Intent
+          import android.content.res.ColorStateList
+          import android.graphics.Color
           import android.graphics.Typeface
           import android.os.Bundle
           import android.view.Gravity
           import android.view.View
           import android.widget.FrameLayout
+          import android.widget.ImageView
           import android.widget.LinearLayout
           import android.widget.TextView
           import androidx.appcompat.app.AlertDialog
@@ -1878,10 +1878,6 @@ jobs:
           import androidx.core.content.ContextCompat
           import com.google.android.material.button.MaterialButton
           import com.google.android.material.textfield.TextInputEditText
-          import com.google.android.material.textfield.TextInputLayout
-          import java.text.SimpleDateFormat
-          import java.util.Date
-          import java.util.Locale
           import java.util.UUID
 
           class SpotsActivity : AppCompatActivity() {
@@ -1913,6 +1909,34 @@ jobs:
               private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
               private fun color(id: Int) = ContextCompat.getColor(this, id)
 
+              /** Builds one rounded, borderless input row (value left, small caption right) for dialogs. */
+              private fun fieldRow(caption: String, inputTypeFlags: Int): Pair<LinearLayout, TextInputEditText> {
+                  val input = TextInputEditText(this).apply {
+                      setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                      setTextColor(color(R.color.ink))
+                      setHintTextColor(color(R.color.river_soft))
+                      textSize = 16f
+                      inputType = inputTypeFlags
+                  }
+                  val row = LinearLayout(this).apply {
+                      orientation = LinearLayout.HORIZONTAL
+                      gravity = Gravity.CENTER_VERTICAL
+                      background = ContextCompat.getDrawable(this@SpotsActivity, R.drawable.bg_field_row)
+                      setPadding(dp(14), dp(4), dp(14), dp(4))
+                      layoutParams = LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT, dp(56)
+                      ).apply { topMargin = dp(8) }
+                  }
+                  row.addView(input, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                  row.addView(TextView(this).apply {
+                      text = caption
+                      textSize = 12f
+                      setTextColor(color(R.color.river_soft))
+                      setPadding(dp(8), 0, 0, 0)
+                  })
+                  return row to input
+              }
+
               private fun textButton(label: String, c: Int = R.color.brick, onClick: () -> Unit): MaterialButton =
                   MaterialButton(this, null, android.R.attr.borderlessButtonStyle).apply {
                       text = label
@@ -1920,6 +1944,22 @@ jobs:
                       setTextColor(color(c))
                       setOnClickListener { onClick() }
                   }
+
+              /** A small tappable icon (edit/delete/add/chevron) with a ripple, used instead of text buttons. */
+              private fun iconButton(drawableRes: Int, tintColor: Int, sizeDp: Int = 36, onClick: (() -> Unit)? = null): View =
+                  ImageView(this).apply {
+                      setImageResource(drawableRes)
+                      setColorFilter(tintColor)
+                      val pad = dp(7)
+                      setPadding(pad, pad, pad, pad)
+                      background = ContextCompat.getDrawable(this@SpotsActivity, android.R.drawable.list_selector_background)
+                      isClickable = onClick != null
+                      isFocusable = onClick != null
+                      layoutParams = LinearLayout.LayoutParams(dp(sizeDp), dp(sizeDp))
+                      onClick?.let { setOnClickListener { _ -> it() } }
+                  }
+
+              private val expandedCities = mutableSetOf<String>()
 
               private fun render() {
                   val active = TripStore.activeTrip(this)
@@ -1940,29 +1980,47 @@ jobs:
                       })
                       return
                   }
+                  // First city opens by default so the list isn't empty-looking on first visit
+                  if (expandedCities.isEmpty()) expandedCities.add(cities.first().key)
 
                   for (c in cities) {
+                      val isOpen = c.key in expandedCities
                       val card = LinearLayout(this).apply {
                           orientation = LinearLayout.VERTICAL
                           background = ContextCompat.getDrawable(this@SpotsActivity, R.drawable.bg_paper)
-                          setPadding(dp(16), dp(10), dp(8), dp(10))
+                          setPadding(dp(14), dp(6), dp(10), dp(6))
                           layoutParams = LinearLayout.LayoutParams(
                               LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
                           ).apply { topMargin = dp(12) }
                       }
 
+                      // --- Accordion header ---
                       val head = LinearLayout(this).apply {
                           orientation = LinearLayout.HORIZONTAL
                           gravity = Gravity.CENTER_VERTICAL
+                          setPadding(0, dp(6), 0, dp(6))
+                          isClickable = true
+                          setOnClickListener {
+                              if (isOpen) expandedCities.remove(c.key) else expandedCities.add(c.key)
+                              render()
+                          }
                       }
+                      val chevron = ImageView(this).apply {
+                          setImageResource(R.drawable.ic_expand_more)
+                          setColorFilter(color(R.color.river_soft))
+                          rotation = if (isOpen) 180f else 0f
+                          layoutParams = LinearLayout.LayoutParams(dp(22), dp(22)).apply { marginEnd = dp(8) }
+                      }
+                      head.addView(chevron)
                       head.addView(TextView(this).apply {
-                          text = c.name
-                          textSize = 17f
+                          text = c.name + "  (${c.spots.size})"
+                          textSize = 16f
                           setTypeface(typeface, Typeface.BOLD)
                           setTextColor(color(R.color.ink))
                           layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                       })
-                      head.addView(textButton("Remove city") {
+                      head.addView(iconButton(R.drawable.ic_add, color(R.color.saffron)) { showAddSpotDialog(c.key, c.name) })
+                      head.addView(iconButton(R.drawable.ic_delete, color(R.color.brick)) {
                           AlertDialog.Builder(this)
                               .setTitle("Remove " + c.name + "?")
                               .setMessage("This deletes the city and all its spots. Trip history is kept.")
@@ -1970,6 +2028,7 @@ jobs:
                                   val all = Store.load(this)
                                   all.removeAll { it.key == c.key }
                                   Store.save(this, all)
+                                  expandedCities.remove(c.key)
                                   render()
                               }
                               .setNegativeButton("Cancel", null)
@@ -1977,68 +2036,112 @@ jobs:
                       })
                       card.addView(head)
 
-                      for (s in c.spots) {
-                          val trips = TripStore.tripsForCity(this, c.key).filter { it.spotName == s.name && it.endTime != null }
-                          val totalCost = trips.sumOf { it.totalCost }
-                          val isActiveHere = active != null && active.cityKey == c.key && active.spotName == s.name
-
-                          val row = LinearLayout(this).apply {
-                              orientation = LinearLayout.VERTICAL
-                              setPadding(0, dp(6), 0, dp(6))
-                              setOnClickListener {
-                                  startActivity(
-                                      Intent(this@SpotsActivity, SpotDetailActivity::class.java)
-                                          .putExtra("cityKey", c.key)
-                                          .putExtra("cityName", c.name)
-                                          .putExtra("spotName", s.name)
-                                  )
-                              }
-                          }
-                          val nameRow = LinearLayout(this).apply {
-                              orientation = LinearLayout.HORIZONTAL
-                              gravity = Gravity.CENTER_VERTICAL
-                          }
-                          nameRow.addView(TextView(this).apply {
-                              text = s.name
-                              textSize = 15f
-                              setTextColor(color(R.color.ink))
-                              layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                          })
-                          nameRow.addView(textButton("Edit") { showEditSpotDialog(c.key, s.name) })
-                          nameRow.addView(textButton("Delete") {
-                              val all = Store.load(this)
-                              val entry = all.firstOrNull { it.key == c.key }
-                              entry?.spots?.removeAll { it.name == s.name }
-                              if (entry != null && entry.spots.isEmpty()) all.remove(entry)
-                              Store.save(this, all)
-                              render()
-                          })
-                          row.addView(nameRow)
-
-                          val infoRow = LinearLayout(this).apply {
-                              orientation = LinearLayout.HORIZONTAL
-                              gravity = Gravity.CENTER_VERTICAL
-                          }
-                          infoRow.addView(TextView(this).apply {
-                              text = if (trips.isEmpty()) "No trips yet"
-                              else "${trips.size} trip${if (trips.size == 1) "" else "s"} · ${"%.0f".format(totalCost)} spent"
-                              textSize = 12f
-                              setTextColor(color(R.color.river_soft))
-                              layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                          })
-                          if (isActiveHere) {
-                              infoRow.addView(textButton("Recording…", R.color.saffron) {
-                                  TripStore.activeTrip(this)?.let { showEndTripDialog(it) }
+                      // --- Spot rows (collapsible) ---
+                      if (isOpen) {
+                          if (c.spots.isEmpty()) {
+                              card.addView(TextView(this).apply {
+                                  text = "No spots yet — tap + above to add one."
+                                  textSize = 12f
+                                  setTextColor(color(R.color.river_soft))
+                                  setPadding(dp(30), dp(4), 0, dp(10))
                               })
-                          } else if (active == null) {
-                              infoRow.addView(textButton("Start trip", R.color.saffron) { startTrip(c.key, c.name, s.name) })
                           }
-                          row.addView(infoRow)
+                          for (s in c.spots) {
+                              val trips = TripStore.tripsForCity(this, c.key).filter { it.spotName == s.name && it.endTime != null }
+                              val totalCost = trips.sumOf { it.totalCost }
+                              val isActiveHere = active != null && active.cityKey == c.key && active.spotName == s.name
 
-                          card.addView(row)
+                              val row = LinearLayout(this).apply {
+                                  orientation = LinearLayout.HORIZONTAL
+                                  gravity = Gravity.CENTER_VERTICAL
+                                  setPadding(dp(2), dp(8), 0, dp(8))
+                                  isClickable = true
+                                  setOnClickListener {
+                                      startActivity(
+                                          Intent(this@SpotsActivity, SpotDetailActivity::class.java)
+                                              .putExtra("cityKey", c.key)
+                                              .putExtra("cityName", c.name)
+                                              .putExtra("spotName", s.name)
+                                      )
+                                  }
+                              }
+                              // Colored icon badge: saffron pin normally, green check once visited
+                              row.addView(ImageView(this).apply {
+                                  setImageResource(if (trips.isNotEmpty()) R.drawable.ic_check_small else R.drawable.ic_pin_small)
+                                  background = ContextCompat.getDrawable(this@SpotsActivity, R.drawable.bg_icon_circle)
+                                  backgroundTintList = android.content.res.ColorStateList.valueOf(
+                                      if (trips.isNotEmpty()) android.graphics.Color.parseColor("#4CAF7D") else color(R.color.saffron)
+                                  )
+                                  val pad = dp(7)
+                                  setPadding(pad, pad, pad, pad)
+                                  layoutParams = LinearLayout.LayoutParams(dp(32), dp(32)).apply { marginEnd = dp(10) }
+                              })
+
+                              val textCol = LinearLayout(this).apply {
+                                  orientation = LinearLayout.VERTICAL
+                                  layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                              }
+                              textCol.addView(TextView(this).apply {
+                                  text = s.name
+                                  textSize = 15f
+                                  setTextColor(color(R.color.ink))
+                              })
+                              textCol.addView(TextView(this).apply {
+                                  text = when {
+                                      isActiveHere -> "Recording now…"
+                                      trips.isEmpty() -> "No trips yet"
+                                      else -> "${trips.size} trip${if (trips.size == 1) "" else "s"} · ${"%.0f".format(totalCost)} spent"
+                                  }
+                                  textSize = 12f
+                                  setTextColor(if (isActiveHere) color(R.color.saffron) else color(R.color.river_soft))
+                              })
+                              row.addView(textCol)
+
+                              if (isActiveHere) {
+                                  row.addView(iconButton(R.drawable.ic_stat_pin, color(R.color.saffron)) { showEndTripDialog(active!!) })
+                              } else if (active == null) {
+                                  row.addView(iconButton(R.drawable.ic_add, color(R.color.saffron)) { startTrip(c.key, c.name, s.name) })
+                              }
+                              row.addView(iconButton(R.drawable.ic_edit, color(R.color.river_soft)) { showEditSpotDialog(c.key, s.name) })
+                              row.addView(iconButton(R.drawable.ic_delete, color(R.color.brick)) {
+                                  val all = Store.load(this)
+                                  val entry = all.firstOrNull { it.key == c.key }
+                                  entry?.spots?.removeAll { it.name == s.name }
+                                  if (entry != null && entry.spots.isEmpty()) all.remove(entry)
+                                  Store.save(this, all)
+                                  render()
+                              })
+                              card.addView(row)
+                          }
                       }
                       spotsList.addView(card)
                   }
+              }
+
+              private fun showAddSpotDialog(cityKey: String, cityName: String) {
+                  val (row, input) = fieldRow("Spot name", android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS)
+                  val wrap = FrameLayout(this).apply {
+                      val pad = dp(20)
+                      setPadding(pad, dp(8), pad, 0)
+                      addView(row)
+                  }
+                  AlertDialog.Builder(this)
+                      .setTitle("Add a spot in $cityName")
+                      .setView(wrap)
+                      .setPositiveButton("Add") { _, _ ->
+                          val name = input.text?.toString()?.trim().orEmpty()
+                          if (name.isEmpty()) return@setPositiveButton
+                          val all = Store.load(this)
+                          val entry = all.firstOrNull { it.key == cityKey } ?: return@setPositiveButton
+                          if (entry.spots.none { Store.norm(it.name) == Store.norm(name) }) {
+                              entry.spots.add(Spot(Store.titleCase(name), false))
+                          }
+                          Store.save(this, all)
+                          expandedCities.add(cityKey)
+                          render()
+                      }
+                      .setNegativeButton("Cancel", null)
+                      .show()
               }
 
               private fun startTrip(cityKey: String, cityName: String, spotName: String) {
@@ -2069,22 +2172,10 @@ jobs:
                   val amountInputs = mutableMapOf<String, TextInputEditText>()
                   val fieldsLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
                   for (cat in TRIP_COST_CATEGORIES) {
-                      val input = TextInputEditText(this).apply {
-                          inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-                          hint = "0"
-                      }
-                      val til = TextInputLayout(this).apply {
-                          boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_FILLED
-                          setBoxCornerRadii(dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat())
-                          setBoxBackgroundColorResource(R.color.field)
-                          hint = cat
-                          layoutParams = LinearLayout.LayoutParams(
-                              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-                          ).apply { topMargin = dp(8) }
-                          addView(input)
-                      }
+                      val (row, input) = fieldRow(cat, android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL)
+                      input.hint = "0"
                       amountInputs[cat] = input
-                      fieldsLayout.addView(til)
+                      fieldsLayout.addView(row)
                   }
                   val wrap = FrameLayout(this).apply {
                       val pad = dp(20)
@@ -2114,21 +2205,13 @@ jobs:
               }
 
               private fun showEditSpotDialog(cityKey: String, oldName: String) {
-                  val input = TextInputEditText(this).apply {
-                      setText(oldName)
-                      setSelection(text?.length ?: 0)
-                  }
-                  val til = TextInputLayout(this).apply {
-                      boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_FILLED
-                      setBoxCornerRadii(dp(14).toFloat(), dp(14).toFloat(), dp(14).toFloat(), dp(14).toFloat())
-                      setBoxBackgroundColorResource(R.color.field)
-                      hint = "Spot name"
-                      addView(input)
-                  }
+                  val (row, input) = fieldRow("Spot name", android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS)
+                  input.setText(oldName)
+                  input.setSelection(input.text?.length ?: 0)
                   val wrap = FrameLayout(this).apply {
                       val pad = dp(20)
                       setPadding(pad, dp(8), pad, 0)
-                      addView(til)
+                      addView(row)
                   }
                   AlertDialog.Builder(this)
                       .setTitle("Edit spot name")
@@ -2828,48 +2911,63 @@ jobs:
           </shape>
           SPOT_EOF_26
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_navbar.xml <<'SPOT_EOF_27'
+          cat > app/src/main/res/drawable/bg_field_row.xml <<'SPOT_EOF_27'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+              <solid android:color="@color/field" />
+              <corners android:radius="16dp" />
+          </shape>
+          SPOT_EOF_27
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/bg_icon_circle.xml <<'SPOT_EOF_28'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+              <solid android:color="@color/saffron" />
+          </shape>
+          SPOT_EOF_28
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/bg_navbar.xml <<'SPOT_EOF_29'
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
               <solid android:color="@color/paper" />
           </shape>
-          SPOT_EOF_27
+          SPOT_EOF_29
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_paper.xml <<'SPOT_EOF_28'
+          cat > app/src/main/res/drawable/bg_paper.xml <<'SPOT_EOF_30'
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
               <solid android:color="@color/paper" />
               <stroke android:width="1.5dp" android:color="@color/line" />
               <corners android:radius="18dp" />
           </shape>
-          SPOT_EOF_28
+          SPOT_EOF_30
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_river.xml <<'SPOT_EOF_29'
+          cat > app/src/main/res/drawable/bg_river.xml <<'SPOT_EOF_31'
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
               <solid android:color="@color/river" />
               <corners android:radius="22dp" />
           </shape>
-          SPOT_EOF_29
+          SPOT_EOF_31
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_saffron.xml <<'SPOT_EOF_30'
+          cat > app/src/main/res/drawable/bg_saffron.xml <<'SPOT_EOF_32'
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
               <solid android:color="@color/saffron" />
               <corners android:radius="18dp" />
           </shape>
-          SPOT_EOF_30
+          SPOT_EOF_32
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_add.xml <<'SPOT_EOF_31'
+          cat > app/src/main/res/drawable/ic_add.xml <<'SPOT_EOF_33'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
               android:viewportWidth="24" android:viewportHeight="24">
               <path android:fillColor="#FFFFFF" android:pathData="M19,13h-6v6h-2v-6L5,13v-2h6L11,5h2v6h6v2z" />
           </vector>
-          SPOT_EOF_31
+          SPOT_EOF_33
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_back.xml <<'SPOT_EOF_32'
+          cat > app/src/main/res/drawable/ic_back.xml <<'SPOT_EOF_34'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
@@ -2878,9 +2976,45 @@ jobs:
                   android:fillColor="#8A9DA0"
                   android:pathData="M20,11H7.83l5.59,-5.59L12,4l-8,8l8,8l1.41,-1.41L7.83,13H20V11z" />
           </vector>
-          SPOT_EOF_32
+          SPOT_EOF_34
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_launcher_foreground.xml <<'SPOT_EOF_33'
+          cat > app/src/main/res/drawable/ic_check_small.xml <<'SPOT_EOF_35'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="18dp" android:height="18dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFF" android:pathData="M9,16.17L4.83,12l-1.42,1.41L9,19 21,7l-1.41,-1.41z" />
+          </vector>
+          SPOT_EOF_35
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/ic_delete.xml <<'SPOT_EOF_36'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="20dp" android:height="20dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#8A9DA0" android:pathData="M6,19c0,1.1 0.9,2 2,2h8c1.1,0 2,-0.9 2,-2L18,7L6,7zM19,4h-3.5l-1,-1h-5l-1,1L5,4v2h14z" />
+          </vector>
+          SPOT_EOF_36
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/ic_edit.xml <<'SPOT_EOF_37'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="20dp" android:height="20dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#8A9DA0" android:pathData="M3,17.25L3,21h3.75L17.81,9.94l-3.75,-3.75zM20.71,7.04c0.39,-0.39 0.39,-1.02 0,-1.41l-2.34,-2.34c-0.39,-0.39 -1.02,-0.39 -1.41,0l-1.83,1.83 3.75,3.75z" />
+          </vector>
+          SPOT_EOF_37
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/ic_expand_more.xml <<'SPOT_EOF_38'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="22dp" android:height="22dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#8A9DA0" android:pathData="M16.59,8.59L12,13.17 7.41,8.59 6,10l6,6 6,-6z" />
+          </vector>
+          SPOT_EOF_38
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/ic_launcher_foreground.xml <<'SPOT_EOF_39'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="108dp" android:height="108dp"
@@ -2892,45 +3026,45 @@ jobs:
                   android:fillColor="#0F3B4C"
                   android:pathData="M54,41a7,7 0 1,0 0.01,0z" />
           </vector>
-          SPOT_EOF_33
+          SPOT_EOF_39
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_nav_home.xml <<'SPOT_EOF_34'
+          cat > app/src/main/res/drawable/ic_nav_home.xml <<'SPOT_EOF_40'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
               android:viewportWidth="24" android:viewportHeight="24">
               <path android:fillColor="#FFFFFF" android:pathData="M10,20v-6h4v6h5v-8h3L12,3 2,12h3v8z" />
           </vector>
-          SPOT_EOF_34
+          SPOT_EOF_40
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_nav_list.xml <<'SPOT_EOF_35'
+          cat > app/src/main/res/drawable/ic_nav_list.xml <<'SPOT_EOF_41'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
               android:viewportWidth="24" android:viewportHeight="24">
               <path android:fillColor="#FFFFFF" android:pathData="M4,7h2v2L4,9zM4,11h2v2L4,13zM4,15h2v2L4,17zM8,7h12v2L8,9zM8,11h12v2L8,13zM8,15h12v2L8,17z" />
           </vector>
-          SPOT_EOF_35
+          SPOT_EOF_41
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_nav_profile.xml <<'SPOT_EOF_36'
+          cat > app/src/main/res/drawable/ic_nav_profile.xml <<'SPOT_EOF_42'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
               android:viewportWidth="24" android:viewportHeight="24">
               <path android:fillColor="#FFFFFF" android:pathData="M12,12c2.21,0 4,-1.79 4,-4s-1.79,-4 -4,-4 -4,1.79 -4,4 1.79,4 4,4zM12,14c-2.67,0 -8,1.34 -8,4v2h16v-2c0,-2.66 -5.33,-4 -8,-4z" />
           </vector>
-          SPOT_EOF_36
+          SPOT_EOF_42
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_nav_stats.xml <<'SPOT_EOF_37'
+          cat > app/src/main/res/drawable/ic_nav_stats.xml <<'SPOT_EOF_43'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
               android:viewportWidth="24" android:viewportHeight="24">
               <path android:fillColor="#FFFFFF" android:pathData="M5,9.2h3L8,19L5,19zM10.6,5h3L13.6,19h-3zM16.2,13h3L19.2,19h-3z" />
           </vector>
-          SPOT_EOF_37
+          SPOT_EOF_43
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_person.xml <<'SPOT_EOF_38'
+          cat > app/src/main/res/drawable/ic_person.xml <<'SPOT_EOF_44'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
@@ -2939,9 +3073,18 @@ jobs:
                   android:fillColor="#FFFFFF"
                   android:pathData="M12,12c2.21,0 4,-1.79 4,-4s-1.79,-4 -4,-4 -4,1.79 -4,4 1.79,4 4,4zM12,14c-2.67,0 -8,1.34 -8,4v2h16v-2c0,-2.66 -5.33,-4 -8,-4z" />
           </vector>
-          SPOT_EOF_38
+          SPOT_EOF_44
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_settings.xml <<'SPOT_EOF_39'
+          cat > app/src/main/res/drawable/ic_pin_small.xml <<'SPOT_EOF_45'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="18dp" android:height="18dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFF" android:pathData="M12,2a7,7 0 0,0 -7,7c0,5.2 7,13 7,13s7,-7.8 7,-13a7,7 0 0,0 -7,-7zM12,11.5a2.5,2.5 0 1,1 0,-5a2.5,2.5 0 0,1 0,5z" />
+          </vector>
+          SPOT_EOF_45
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/ic_settings.xml <<'SPOT_EOF_46'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
@@ -2950,18 +3093,18 @@ jobs:
                   android:fillColor="#8A9DA0"
                   android:pathData="M19.14,12.94c0.04,-0.3 0.06,-0.61 0.06,-0.94c0,-0.32 -0.02,-0.64 -0.07,-0.94l2.03,-1.58c0.18,-0.14 0.23,-0.41 0.12,-0.61l-1.92,-3.32c-0.12,-0.22 -0.37,-0.29 -0.59,-0.22l-2.39,0.96c-0.5,-0.38 -1.03,-0.7 -1.62,-0.94L14.4,2.81c-0.04,-0.24 -0.24,-0.41 -0.48,-0.41h-3.84c-0.24,0 -0.43,0.17 -0.47,0.41L9.25,5.35C8.66,5.59 8.12,5.92 7.63,6.29L5.24,5.33c-0.22,-0.08 -0.47,0 -0.59,0.22L2.74,8.87C2.62,9.08 2.66,9.34 2.86,9.48l2.03,1.58C4.84,11.36 4.8,11.69 4.8,12s0.02,0.64 0.07,0.94l-2.03,1.58c-0.18,0.14 -0.23,0.41 -0.12,0.61l1.92,3.32c0.12,0.22 0.37,0.29 0.59,0.22l2.39,-0.96c0.5,0.38 1.03,0.7 1.62,0.94l0.36,2.54c0.05,0.24 0.24,0.41 0.48,0.41h3.84c0.24,0 0.44,-0.17 0.47,-0.41l0.36,-2.54c0.59,-0.24 1.13,-0.56 1.62,-0.94l2.39,0.96c0.22,0.08 0.47,0 0.59,-0.22l1.92,-3.32c0.12,-0.22 0.07,-0.47 -0.12,-0.61L19.14,12.94zM12,15.6c-1.98,0 -3.6,-1.62 -3.6,-3.6s1.62,-3.6 3.6,-3.6s3.6,1.62 3.6,3.6S13.98,15.6 12,15.6z" />
           </vector>
-          SPOT_EOF_39
+          SPOT_EOF_46
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_share.xml <<'SPOT_EOF_40'
+          cat > app/src/main/res/drawable/ic_share.xml <<'SPOT_EOF_47'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
               android:viewportWidth="24" android:viewportHeight="24">
               <path android:fillColor="#FFFFFF" android:pathData="M18,16.08c-0.76,0 -1.44,0.3 -1.96,0.77L8.91,12.7c0.05,-0.23 0.09,-0.46 0.09,-0.7s-0.04,-0.47 -0.09,-0.7l7.05,-4.11c0.54,0.5 1.25,0.81 2.04,0.81 1.66,0 3,-1.34 3,-3s-1.34,-3 -3,-3 -3,1.34 -3,3c0,0.24 0.04,0.47 0.09,0.7L7.04,9.81C6.5,9.31 5.79,9 5,9c-1.66,0 -3,1.34 -3,3s1.34,3 3,3c0.79,0 1.5,-0.31 2.04,-0.81l7.12,4.16c-0.05,0.21 -0.08,0.43 -0.08,0.65 0,1.61 1.31,2.92 2.92,2.92 1.61,0 2.92,-1.31 2.92,-2.92s-1.31,-2.92 -2.92,-2.92z" />
           </vector>
-          SPOT_EOF_40
+          SPOT_EOF_47
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_stat_pin.xml <<'SPOT_EOF_41'
+          cat > app/src/main/res/drawable/ic_stat_pin.xml <<'SPOT_EOF_48'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
@@ -2970,9 +3113,9 @@ jobs:
                   android:fillColor="#FFFFFFFF"
                   android:pathData="M12,2a7,7 0 0,0 -7,7c0,5.2 7,13 7,13s7,-7.8 7,-13a7,7 0 0,0 -7,-7zM12,11.5a2.5,2.5 0 1,1 0,-5a2.5,2.5 0 0,1 0,5z" />
           </vector>
-          SPOT_EOF_41
+          SPOT_EOF_48
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_main.xml <<'SPOT_EOF_42'
+          cat > app/src/main/res/layout/activity_main.xml <<'SPOT_EOF_49'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               xmlns:tools="http://schemas.android.com/tools"
@@ -3160,53 +3303,85 @@ jobs:
                           android:textSize="16sp"
                           android:textStyle="bold" />
 
-                      <com.google.android.material.textfield.TextInputLayout
+                      <LinearLayout
                           android:id="@+id/cityLayout"
-                          style="@style/Widget.SpotReminder.TextField"
                           android:layout_width="match_parent"
-                          android:layout_height="wrap_content"
-                          android:layout_marginTop="8dp"
-                          android:hint="City name (in English)">
+                          android:layout_height="56dp"
+                          android:layout_marginTop="10dp"
+                          android:background="@drawable/bg_field_row"
+                          android:gravity="center_vertical"
+                          android:orientation="horizontal"
+                          android:paddingStart="14dp"
+                          android:paddingEnd="14dp">
 
                           <android.widget.AutoCompleteTextView
                               android:id="@+id/cityInput"
-                              android:layout_width="match_parent"
+                              android:layout_width="0dp"
                               android:layout_height="wrap_content"
+                              android:layout_weight="1"
+                              android:background="@null"
                               android:completionThreshold="2"
                               android:dropDownWidth="match_parent"
                               android:imeOptions="actionNext"
                               android:inputType="textCapWords"
-                              android:singleLine="true" />
-                      </com.google.android.material.textfield.TextInputLayout>
+                              android:singleLine="true"
+                              android:textColor="@color/ink"
+                              android:textColorHint="@color/river_soft"
+                              android:textSize="16sp" />
+
+                          <TextView
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:layout_marginStart="8dp"
+                              android:text="City"
+                              android:textColor="@color/river_soft"
+                              android:textSize="12sp" />
+                      </LinearLayout>
 
                       <com.google.android.material.button.MaterialButton
                           android:id="@+id/btnMap"
                           style="?attr/materialButtonOutlinedStyle"
                           android:layout_width="match_parent"
                           android:layout_height="40dp"
-                          android:layout_marginTop="4dp"
+                          android:layout_marginTop="8dp"
                           android:text="Pick city on map"
                           android:textAllCaps="false"
                           android:textSize="13sp" />
 
-                      <com.google.android.material.textfield.TextInputLayout
+                      <LinearLayout
                           android:id="@+id/spotLayout"
-                          style="@style/Widget.SpotReminder.TextField"
                           android:layout_width="match_parent"
-                          android:layout_height="wrap_content"
-                          android:layout_marginTop="6dp"
-                          android:hint="Spot name">
+                          android:layout_height="56dp"
+                          android:layout_marginTop="8dp"
+                          android:background="@drawable/bg_field_row"
+                          android:gravity="center_vertical"
+                          android:orientation="horizontal"
+                          android:paddingStart="14dp"
+                          android:paddingEnd="14dp">
 
                           <android.widget.AutoCompleteTextView
                               android:id="@+id/spotInput"
-                              android:layout_width="match_parent"
+                              android:layout_width="0dp"
                               android:layout_height="wrap_content"
+                              android:layout_weight="1"
+                              android:background="@null"
                               android:completionThreshold="2"
                               android:dropDownWidth="match_parent"
                               android:imeOptions="actionDone"
                               android:inputType="textCapWords"
-                              android:singleLine="true" />
-                      </com.google.android.material.textfield.TextInputLayout>
+                              android:singleLine="true"
+                              android:textColor="@color/ink"
+                              android:textColorHint="@color/river_soft"
+                              android:textSize="16sp" />
+
+                          <TextView
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:layout_marginStart="8dp"
+                              android:text="Spot"
+                              android:textColor="@color/river_soft"
+                              android:textSize="12sp" />
+                      </LinearLayout>
 
                       <com.google.android.material.button.MaterialButton
                           android:id="@+id/btnAdd"
@@ -3239,9 +3414,9 @@ jobs:
 
               <include layout="@layout/bottom_nav" />
           </LinearLayout>
-          SPOT_EOF_42
+          SPOT_EOF_49
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_map.xml <<'SPOT_EOF_43'
+          cat > app/src/main/res/layout/activity_map.xml <<'SPOT_EOF_50'
           <?xml version="1.0" encoding="utf-8"?>
           <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
@@ -3268,23 +3443,32 @@ jobs:
                       android:gravity="center_vertical"
                       android:orientation="horizontal">
 
-                      <com.google.android.material.textfield.TextInputLayout
-                          style="@style/Widget.SpotReminder.TextField"
+                      <LinearLayout
                           android:layout_width="0dp"
-                          android:layout_height="wrap_content"
+                          android:layout_height="48dp"
                           android:layout_weight="1"
-                          android:hint="Search a city">
+                          android:background="@drawable/bg_field_row"
+                          android:gravity="center_vertical"
+                          android:orientation="horizontal"
+                          android:paddingStart="12dp"
+                          android:paddingEnd="12dp">
 
                           <android.widget.AutoCompleteTextView
                               android:id="@+id/searchInput"
-                              android:layout_width="match_parent"
+                              android:layout_width="0dp"
                               android:layout_height="wrap_content"
+                              android:layout_weight="1"
+                              android:background="@null"
                               android:completionThreshold="2"
                               android:dropDownWidth="match_parent"
+                              android:hint="Search a city"
                               android:imeOptions="actionSearch"
                               android:inputType="textCapWords"
-                              android:singleLine="true" />
-                      </com.google.android.material.textfield.TextInputLayout>
+                              android:singleLine="true"
+                              android:textColor="@color/ink"
+                              android:textColorHint="@color/river_soft"
+                              android:textSize="15sp" />
+                      </LinearLayout>
 
                       <com.google.android.material.button.MaterialButton
                           android:id="@+id/btnSearch"
@@ -3344,9 +3528,9 @@ jobs:
                       android:textSize="15sp" />
               </LinearLayout>
           </FrameLayout>
-          SPOT_EOF_43
+          SPOT_EOF_50
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_profile.xml <<'SPOT_EOF_44'
+          cat > app/src/main/res/layout/activity_profile.xml <<'SPOT_EOF_51'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
@@ -3494,53 +3678,104 @@ jobs:
                               android:textColor="@color/river_soft"
                               android:textSize="12sp" />
 
-                          <com.google.android.material.textfield.TextInputLayout
-                              style="@style/Widget.SpotReminder.TextField"
+                          <LinearLayout
                               android:layout_width="match_parent"
-                              android:layout_height="wrap_content"
+                              android:layout_height="56dp"
                               android:layout_marginTop="10dp"
-                              android:hint="Full name">
+                              android:background="@drawable/bg_field_row"
+                              android:gravity="center_vertical"
+                              android:orientation="horizontal"
+                              android:paddingStart="14dp"
+                              android:paddingEnd="14dp">
 
                               <com.google.android.material.textfield.TextInputEditText
                                   android:id="@+id/profileNameInput"
-                                  android:layout_width="match_parent"
+                                  android:layout_width="0dp"
                                   android:layout_height="wrap_content"
+                                  android:layout_weight="1"
+                                  android:background="@null"
                                   android:imeOptions="actionNext"
                                   android:inputType="textPersonName|textCapWords"
-                                  android:singleLine="true" />
-                          </com.google.android.material.textfield.TextInputLayout>
+                                  android:singleLine="true"
+                                  android:textColor="@color/ink"
+                                  android:textColorHint="@color/river_soft"
+                                  android:textSize="16sp" />
 
-                          <com.google.android.material.textfield.TextInputLayout
-                              style="@style/Widget.SpotReminder.TextField"
+                              <TextView
+                                  android:layout_width="wrap_content"
+                                  android:layout_height="wrap_content"
+                                  android:layout_marginStart="8dp"
+                                  android:text="First / full name"
+                                  android:textColor="@color/river_soft"
+                                  android:textSize="12sp" />
+                          </LinearLayout>
+
+                          <LinearLayout
                               android:layout_width="match_parent"
-                              android:layout_height="wrap_content"
+                              android:layout_height="56dp"
                               android:layout_marginTop="8dp"
-                              android:hint="Phone number">
+                              android:background="@drawable/bg_field_row"
+                              android:gravity="center_vertical"
+                              android:orientation="horizontal"
+                              android:paddingStart="14dp"
+                              android:paddingEnd="14dp">
 
                               <com.google.android.material.textfield.TextInputEditText
                                   android:id="@+id/profilePhoneInput"
-                                  android:layout_width="match_parent"
+                                  android:layout_width="0dp"
                                   android:layout_height="wrap_content"
+                                  android:layout_weight="1"
+                                  android:background="@null"
                                   android:imeOptions="actionNext"
                                   android:inputType="phone"
-                                  android:singleLine="true" />
-                          </com.google.android.material.textfield.TextInputLayout>
+                                  android:singleLine="true"
+                                  android:textColor="@color/ink"
+                                  android:textColorHint="@color/river_soft"
+                                  android:textSize="16sp" />
 
-                          <com.google.android.material.textfield.TextInputLayout
-                              style="@style/Widget.SpotReminder.TextField"
+                              <TextView
+                                  android:layout_width="wrap_content"
+                                  android:layout_height="wrap_content"
+                                  android:layout_marginStart="8dp"
+                                  android:text="Phone"
+                                  android:textColor="@color/river_soft"
+                                  android:textSize="12sp" />
+                          </LinearLayout>
+
+                          <LinearLayout
                               android:layout_width="match_parent"
                               android:layout_height="wrap_content"
                               android:layout_marginTop="8dp"
-                              android:hint="Address">
+                              android:background="@drawable/bg_field_row"
+                              android:gravity="top"
+                              android:orientation="horizontal"
+                              android:minHeight="56dp"
+                              android:paddingStart="14dp"
+                              android:paddingEnd="14dp"
+                              android:paddingTop="14dp"
+                              android:paddingBottom="14dp">
 
                               <com.google.android.material.textfield.TextInputEditText
                                   android:id="@+id/profileAddressInput"
-                                  android:layout_width="match_parent"
+                                  android:layout_width="0dp"
                                   android:layout_height="wrap_content"
+                                  android:layout_weight="1"
+                                  android:background="@null"
                                   android:imeOptions="actionDone"
                                   android:inputType="textPostalAddress|textCapSentences"
-                                  android:maxLines="3" />
-                          </com.google.android.material.textfield.TextInputLayout>
+                                  android:maxLines="3"
+                                  android:textColor="@color/ink"
+                                  android:textColorHint="@color/river_soft"
+                                  android:textSize="16sp" />
+
+                              <TextView
+                                  android:layout_width="wrap_content"
+                                  android:layout_height="wrap_content"
+                                  android:layout_marginStart="8dp"
+                                  android:text="Address"
+                                  android:textColor="@color/river_soft"
+                                  android:textSize="12sp" />
+                          </LinearLayout>
 
                           <com.google.android.material.button.MaterialButton
                               android:id="@+id/btnSaveProfile"
@@ -3567,9 +3802,9 @@ jobs:
 
               <include layout="@layout/bottom_nav" />
           </LinearLayout>
-          SPOT_EOF_44
+          SPOT_EOF_51
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_settings.xml <<'SPOT_EOF_45'
+          cat > app/src/main/res/layout/activity_settings.xml <<'SPOT_EOF_52'
           <?xml version="1.0" encoding="utf-8"?>
           <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
@@ -3745,9 +3980,9 @@ jobs:
                       android:textSize="12sp" />
               </LinearLayout>
           </ScrollView>
-          SPOT_EOF_45
+          SPOT_EOF_52
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_spot_detail.xml <<'SPOT_EOF_46'
+          cat > app/src/main/res/layout/activity_spot_detail.xml <<'SPOT_EOF_53'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
@@ -3880,9 +4115,9 @@ jobs:
                   </LinearLayout>
               </ScrollView>
           </LinearLayout>
-          SPOT_EOF_46
+          SPOT_EOF_53
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_spots.xml <<'SPOT_EOF_47'
+          cat > app/src/main/res/layout/activity_spots.xml <<'SPOT_EOF_54'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
@@ -3966,9 +4201,9 @@ jobs:
 
               <include layout="@layout/bottom_nav" />
           </LinearLayout>
-          SPOT_EOF_47
+          SPOT_EOF_54
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_stats.xml <<'SPOT_EOF_48'
+          cat > app/src/main/res/layout/activity_stats.xml <<'SPOT_EOF_55'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
@@ -4107,9 +4342,9 @@ jobs:
 
               <include layout="@layout/bottom_nav" />
           </LinearLayout>
-          SPOT_EOF_48
+          SPOT_EOF_55
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_trip_map.xml <<'SPOT_EOF_49'
+          cat > app/src/main/res/layout/activity_trip_map.xml <<'SPOT_EOF_56'
           <?xml version="1.0" encoding="utf-8"?>
           <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
@@ -4177,9 +4412,9 @@ jobs:
                       android:textColor="@color/river" />
               </LinearLayout>
           </FrameLayout>
-          SPOT_EOF_49
+          SPOT_EOF_56
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/bottom_nav.xml <<'SPOT_EOF_50'
+          cat > app/src/main/res/layout/bottom_nav.xml <<'SPOT_EOF_57'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
@@ -4288,17 +4523,17 @@ jobs:
                       android:textSize="11sp" />
               </LinearLayout>
           </LinearLayout>
-          SPOT_EOF_50
+          SPOT_EOF_57
           mkdir -p app/src/main/res/mipmap-anydpi-v26
-          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml <<'SPOT_EOF_51'
+          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml <<'SPOT_EOF_58'
           <?xml version="1.0" encoding="utf-8"?>
           <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
               <background android:drawable="@color/river" />
               <foreground android:drawable="@drawable/ic_launcher_foreground" />
           </adaptive-icon>
-          SPOT_EOF_51
+          SPOT_EOF_58
           mkdir -p app/src/main/res/values-night
-          cat > app/src/main/res/values-night/colors.xml <<'SPOT_EOF_52'
+          cat > app/src/main/res/values-night/colors.xml <<'SPOT_EOF_59'
           <resources>
               <!-- A layered dark palette: background darkest, cards a step lighter, fields a step
                    lighter again, so surfaces read as distinct instead of blending together. -->
@@ -4315,9 +4550,9 @@ jobs:
               <color name="brick">#FF8A75</color>
               <color name="line">#243740</color>
           </resources>
-          SPOT_EOF_52
+          SPOT_EOF_59
           mkdir -p app/src/main/res/values-night
-          cat > app/src/main/res/values-night/themes.xml <<'SPOT_EOF_53'
+          cat > app/src/main/res/values-night/themes.xml <<'SPOT_EOF_60'
           <resources>
               <style name="Theme.SpotReminder" parent="Theme.Material3.DayNight.NoActionBar">
                   <item name="colorPrimary">@color/river</item>
@@ -4329,9 +4564,9 @@ jobs:
                   <item name="android:windowLightStatusBar">false</item>
               </style>
           </resources>
-          SPOT_EOF_53
+          SPOT_EOF_60
           mkdir -p app/src/main/res/values
-          cat > app/src/main/res/values/colors.xml <<'SPOT_EOF_54'
+          cat > app/src/main/res/values/colors.xml <<'SPOT_EOF_61'
           <resources>
               <color name="sea">#E4F1EE</color>
               <color name="sea_deep">#CFE4DF</color>
@@ -4346,15 +4581,15 @@ jobs:
               <color name="brick">#B23A2E</color>
               <color name="line">#B9D3CD</color>
           </resources>
-          SPOT_EOF_54
+          SPOT_EOF_61
           mkdir -p app/src/main/res/values
-          cat > app/src/main/res/values/strings.xml <<'SPOT_EOF_55'
+          cat > app/src/main/res/values/strings.xml <<'SPOT_EOF_62'
           <resources>
               <string name="app_name">Spot Reminder</string>
           </resources>
-          SPOT_EOF_55
+          SPOT_EOF_62
           mkdir -p app/src/main/res/values
-          cat > app/src/main/res/values/styles.xml <<'SPOT_EOF_56'
+          cat > app/src/main/res/values/styles.xml <<'SPOT_EOF_63'
           <resources>
               <style name="ShapeAppearanceOverlay.SpotReminder.TextField" parent="">
                   <item name="cornerFamily">rounded</item>
@@ -4371,9 +4606,9 @@ jobs:
                   <item name="colorControlNormal">@color/field_stroke</item>
               </style>
           </resources>
-          SPOT_EOF_56
+          SPOT_EOF_63
           mkdir -p app/src/main/res/values
-          cat > app/src/main/res/values/themes.xml <<'SPOT_EOF_57'
+          cat > app/src/main/res/values/themes.xml <<'SPOT_EOF_64'
           <resources>
               <style name="Theme.SpotReminder" parent="Theme.Material3.DayNight.NoActionBar">
                   <item name="colorPrimary">@color/river</item>
@@ -4385,14 +4620,14 @@ jobs:
                   <item name="android:windowLightStatusBar">true</item>
               </style>
           </resources>
-          SPOT_EOF_57
+          SPOT_EOF_64
           mkdir -p app/src/main/res/xml
-          cat > app/src/main/res/xml/file_paths.xml <<'SPOT_EOF_58'
+          cat > app/src/main/res/xml/file_paths.xml <<'SPOT_EOF_65'
           <?xml version="1.0" encoding="utf-8"?>
           <paths xmlns:android="http://schemas.android.com/apk/res/android">
               <cache-path name="trip_maps" path="trip_maps/" />
           </paths>
-          SPOT_EOF_58
+          SPOT_EOF_65
 
       - uses: actions/setup-java@v4
         with:
