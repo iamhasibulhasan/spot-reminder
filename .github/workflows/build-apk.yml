@@ -230,7 +230,7 @@ jobs:
               enum class Tab { HOME, SPOTS, STATS, PROFILE }
 
               fun setup(activity: AppCompatActivity, current: Tab) {
-                  val selected = ContextCompat.getColor(activity, R.color.saffron)
+                  val selected = ContextCompat.getColor(activity, R.color.accent)
                   val unselected = ContextCompat.getColor(activity, R.color.river_soft)
 
                   fun style(iconId: Int, labelId: Int, tab: Tab) {
@@ -666,6 +666,24 @@ jobs:
 
                   BottomNav.setup(this, BottomNav.Tab.HOME)
 
+                  findViewById<View>(R.id.homeAvatar).setOnClickListener {
+                      startActivity(Intent(this, ProfileActivity::class.java))
+                  }
+                  findViewById<View>(R.id.btnBell).setOnClickListener { toast("No new alerts") }
+                  findViewById<View>(R.id.homeSearchBar).setOnClickListener {
+                      startActivity(Intent(this, SpotsActivity::class.java))
+                  }
+                  findViewById<View>(R.id.quickAdd).setOnClickListener { cityInput.requestFocus() }
+                  findViewById<View>(R.id.quickTrip).setOnClickListener {
+                      startActivity(Intent(this, SpotsActivity::class.java))
+                  }
+                  findViewById<View>(R.id.quickSpots).setOnClickListener {
+                      startActivity(Intent(this, SpotsActivity::class.java))
+                  }
+                  findViewById<View>(R.id.quickStats).setOnClickListener {
+                      startActivity(Intent(this, StatsActivity::class.java))
+                  }
+
                   cityAdapter = NoFilterAdapter(this)
                   spotAdapter = NoFilterAdapter(this)
                   cityInput.setAdapter(cityAdapter)
@@ -740,7 +758,79 @@ jobs:
               override fun onResume() {
                   super.onResume()
                   updateNudge()
+                  updateGreeting()
+                  renderUpcoming()
                   onReady()
+              }
+
+              private fun updateGreeting() {
+                  val name = Store.profileName(this).trim()
+                  findViewById<TextView>(R.id.greetingName).text = "Hi, " + name.ifBlank { "Traveler" }
+              }
+
+              /** Shows saved spots that have no completed trip yet, as a horizontal card row. */
+              private fun renderUpcoming() {
+                  val list = findViewById<LinearLayout>(R.id.upcomingList)
+                  list.removeAllViews()
+                  val trips = TripStore.loadTrips(this)
+                  val upcoming = mutableListOf<Pair<CityEntry, Spot>>()
+                  for (c in Store.load(this)) {
+                      for (s in c.spots) {
+                          val visited = trips.any { it.cityKey == c.key && it.spotName == s.name && it.endTime != null }
+                          if (!visited) upcoming.add(c to s)
+                      }
+                  }
+                  if (upcoming.isEmpty()) {
+                      list.addView(TextView(this).apply {
+                          text = "Nothing planned yet — add a spot below."
+                          setTextColor(color(R.color.river_soft))
+                          textSize = 13f
+                      })
+                      return
+                  }
+                  for ((c, s) in upcoming.take(10)) {
+                      val card = FrameLayout(this).apply {
+                          background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_deal_card)
+                          layoutParams = LinearLayout.LayoutParams(dp(150), dp(110)).apply { marginEnd = dp(10) }
+                          isClickable = true
+                          setOnClickListener {
+                              startActivity(
+                                  Intent(this@MainActivity, SpotDetailActivity::class.java)
+                                      .putExtra("cityKey", c.key)
+                                      .putExtra("cityName", c.name)
+                                      .putExtra("spotName", s.name)
+                              )
+                          }
+                      }
+                      card.addView(android.widget.ImageView(this).apply {
+                          setImageResource(R.drawable.ic_stat_pin)
+                          alpha = 0.35f
+                          layoutParams = FrameLayout.LayoutParams(dp(56), dp(56)).apply {
+                              gravity = Gravity.CENTER
+                          }
+                      })
+                      val textCol = LinearLayout(this).apply {
+                          orientation = LinearLayout.VERTICAL
+                          layoutParams = FrameLayout.LayoutParams(
+                              FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT
+                          ).apply { gravity = Gravity.BOTTOM; setMargins(dp(12), 0, dp(12), dp(10)) }
+                      }
+                      textCol.addView(TextView(this).apply {
+                          text = s.name
+                          setTextColor(android.graphics.Color.WHITE)
+                          textSize = 14f
+                          setTypeface(typeface, Typeface.BOLD)
+                          maxLines = 1
+                      })
+                      textCol.addView(TextView(this).apply {
+                          text = c.name
+                          setTextColor(android.graphics.Color.parseColor("#D6DEFF"))
+                          textSize = 11f
+                          maxLines = 1
+                      })
+                      card.addView(textCol)
+                      list.addView(card)
+                  }
               }
 
               // ---------- Permission nudge (full controls live in Settings) ----------
@@ -889,7 +979,7 @@ jobs:
                           text = s.name
                           isChecked = s.done
                           textSize = 16f
-                          setTextColor(color(R.color.river))
+                          setTextColor(android.graphics.Color.WHITE)
                           setPadding(dp(8), dp(10), dp(8), dp(10))
                           setOnCheckedChangeListener { _, checked ->
                               s.done = checked
@@ -1820,7 +1910,7 @@ jobs:
                           text = "%.0f total".format(t.totalCost)
                           textSize = 15f
                           setTypeface(typeface, Typeface.BOLD)
-                          setTextColor(color(R.color.saffron))
+                          setTextColor(color(R.color.accent))
                       })
                       card.addView(statsRow)
 
@@ -2019,7 +2109,7 @@ jobs:
                           setTextColor(color(R.color.ink))
                           layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                       })
-                      head.addView(iconButton(R.drawable.ic_add, color(R.color.saffron)) { showAddSpotDialog(c.key, c.name) })
+                      head.addView(iconButton(R.drawable.ic_add, color(R.color.accent)) { showAddSpotDialog(c.key, c.name) })
                       head.addView(iconButton(R.drawable.ic_delete, color(R.color.brick)) {
                           AlertDialog.Builder(this)
                               .setTitle("Remove " + c.name + "?")
@@ -2070,7 +2160,7 @@ jobs:
                                   setImageResource(if (trips.isNotEmpty()) R.drawable.ic_check_small else R.drawable.ic_pin_small)
                                   background = ContextCompat.getDrawable(this@SpotsActivity, R.drawable.bg_icon_circle)
                                   backgroundTintList = android.content.res.ColorStateList.valueOf(
-                                      if (trips.isNotEmpty()) android.graphics.Color.parseColor("#4CAF7D") else color(R.color.saffron)
+                                      if (trips.isNotEmpty()) android.graphics.Color.parseColor("#4CAF7D") else color(R.color.accent)
                                   )
                                   val pad = dp(7)
                                   setPadding(pad, pad, pad, pad)
@@ -2093,14 +2183,14 @@ jobs:
                                       else -> "${trips.size} trip${if (trips.size == 1) "" else "s"} · ${"%.0f".format(totalCost)} spent"
                                   }
                                   textSize = 12f
-                                  setTextColor(if (isActiveHere) color(R.color.saffron) else color(R.color.river_soft))
+                                  setTextColor(if (isActiveHere) color(R.color.accent) else color(R.color.river_soft))
                               })
                               row.addView(textCol)
 
                               if (isActiveHere) {
-                                  row.addView(iconButton(R.drawable.ic_stat_pin, color(R.color.saffron)) { showEndTripDialog(active!!) })
+                                  row.addView(iconButton(R.drawable.ic_stat_pin, color(R.color.accent)) { showEndTripDialog(active!!) })
                               } else if (active == null) {
-                                  row.addView(iconButton(R.drawable.ic_add, color(R.color.saffron)) { startTrip(c.key, c.name, s.name) })
+                                  row.addView(iconButton(R.drawable.ic_add, color(R.color.accent)) { startTrip(c.key, c.name, s.name) })
                               }
                               row.addView(iconButton(R.drawable.ic_edit, color(R.color.river_soft)) { showEditSpotDialog(c.key, s.name) })
                               row.addView(iconButton(R.drawable.ic_delete, color(R.color.brick)) {
@@ -2902,72 +2992,100 @@ jobs:
           </shape>
           SPOT_EOF_25
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_current.xml <<'SPOT_EOF_26'
+          cat > app/src/main/res/drawable/bg_category_circle.xml <<'SPOT_EOF_26'
           <?xml version="1.0" encoding="utf-8"?>
-          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-              <solid android:color="@color/paper" />
-              <stroke android:width="2.5dp" android:color="@color/saffron" />
-              <corners android:radius="18dp" />
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+              <solid android:color="@color/accent_soft" />
           </shape>
           SPOT_EOF_26
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_field_row.xml <<'SPOT_EOF_27'
+          cat > app/src/main/res/drawable/bg_current.xml <<'SPOT_EOF_27'
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-              <solid android:color="@color/field" />
-              <corners android:radius="16dp" />
+              <solid android:color="@color/paper" />
+              <stroke android:width="2.5dp" android:color="@color/accent" />
+              <corners android:radius="22dp" />
           </shape>
           SPOT_EOF_27
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_icon_circle.xml <<'SPOT_EOF_28'
+          cat > app/src/main/res/drawable/bg_deal_card.xml <<'SPOT_EOF_28'
           <?xml version="1.0" encoding="utf-8"?>
-          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
-              <solid android:color="@color/saffron" />
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+              <gradient
+                  android:angle="315"
+                  android:startColor="#5B7CF0"
+                  android:endColor="#2F3F8C"
+                  android:type="linear" />
+              <corners android:radius="20dp" />
           </shape>
           SPOT_EOF_28
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_navbar.xml <<'SPOT_EOF_29'
+          cat > app/src/main/res/drawable/bg_field_row.xml <<'SPOT_EOF_29'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+              <solid android:color="@color/field" />
+              <corners android:radius="18dp" />
+          </shape>
+          SPOT_EOF_29
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/bg_icon_circle.xml <<'SPOT_EOF_30'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+              <solid android:color="@color/accent" />
+          </shape>
+          SPOT_EOF_30
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/bg_navbar.xml <<'SPOT_EOF_31'
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
               <solid android:color="@color/paper" />
           </shape>
-          SPOT_EOF_29
+          SPOT_EOF_31
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_paper.xml <<'SPOT_EOF_30'
+          cat > app/src/main/res/drawable/bg_paper.xml <<'SPOT_EOF_32'
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
               <solid android:color="@color/paper" />
               <stroke android:width="1.5dp" android:color="@color/line" />
-              <corners android:radius="18dp" />
-          </shape>
-          SPOT_EOF_30
-          mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_river.xml <<'SPOT_EOF_31'
-          <?xml version="1.0" encoding="utf-8"?>
-          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-              <solid android:color="@color/river" />
               <corners android:radius="22dp" />
-          </shape>
-          SPOT_EOF_31
-          mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_saffron.xml <<'SPOT_EOF_32'
-          <?xml version="1.0" encoding="utf-8"?>
-          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-              <solid android:color="@color/saffron" />
-              <corners android:radius="18dp" />
           </shape>
           SPOT_EOF_32
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_add.xml <<'SPOT_EOF_33'
+          cat > app/src/main/res/drawable/bg_river.xml <<'SPOT_EOF_33'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+              <solid android:color="@color/river" />
+              <corners android:radius="24dp" />
+          </shape>
+          SPOT_EOF_33
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/bg_saffron.xml <<'SPOT_EOF_34'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+              <solid android:color="@color/accent" />
+              <corners android:radius="22dp" />
+          </shape>
+          SPOT_EOF_34
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/bg_search_pill.xml <<'SPOT_EOF_35'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+              <solid android:color="@color/paper" />
+              <stroke android:width="1dp" android:color="@color/line" />
+              <corners android:radius="28dp" />
+          </shape>
+          SPOT_EOF_35
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/ic_add.xml <<'SPOT_EOF_36'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
               android:viewportWidth="24" android:viewportHeight="24">
               <path android:fillColor="#FFFFFF" android:pathData="M19,13h-6v6h-2v-6L5,13v-2h6L11,5h2v6h6v2z" />
           </vector>
-          SPOT_EOF_33
+          SPOT_EOF_36
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_back.xml <<'SPOT_EOF_34'
+          cat > app/src/main/res/drawable/ic_back.xml <<'SPOT_EOF_37'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
@@ -2976,45 +3094,54 @@ jobs:
                   android:fillColor="#8A9DA0"
                   android:pathData="M20,11H7.83l5.59,-5.59L12,4l-8,8l8,8l1.41,-1.41L7.83,13H20V11z" />
           </vector>
-          SPOT_EOF_34
+          SPOT_EOF_37
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_check_small.xml <<'SPOT_EOF_35'
+          cat > app/src/main/res/drawable/ic_bell.xml <<'SPOT_EOF_38'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="22dp" android:height="22dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#16213A" android:pathData="M12,22c1.1,0 2,-0.9 2,-2h-4c0,1.1 0.89,2 2,2zM18,16v-5c0,-3.07 -1.64,-5.64 -4.5,-6.32L13.5,4a1.5,1.5 0,0 0,-3 0v0.68C7.63,5.36 6,7.92 6,11v5l-2,2v1h16v-1z" />
+          </vector>
+          SPOT_EOF_38
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/ic_check_small.xml <<'SPOT_EOF_39'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="18dp" android:height="18dp"
               android:viewportWidth="24" android:viewportHeight="24">
               <path android:fillColor="#FFFFFF" android:pathData="M9,16.17L4.83,12l-1.42,1.41L9,19 21,7l-1.41,-1.41z" />
           </vector>
-          SPOT_EOF_35
+          SPOT_EOF_39
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_delete.xml <<'SPOT_EOF_36'
+          cat > app/src/main/res/drawable/ic_delete.xml <<'SPOT_EOF_40'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="20dp" android:height="20dp"
               android:viewportWidth="24" android:viewportHeight="24">
               <path android:fillColor="#8A9DA0" android:pathData="M6,19c0,1.1 0.9,2 2,2h8c1.1,0 2,-0.9 2,-2L18,7L6,7zM19,4h-3.5l-1,-1h-5l-1,1L5,4v2h14z" />
           </vector>
-          SPOT_EOF_36
+          SPOT_EOF_40
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_edit.xml <<'SPOT_EOF_37'
+          cat > app/src/main/res/drawable/ic_edit.xml <<'SPOT_EOF_41'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="20dp" android:height="20dp"
               android:viewportWidth="24" android:viewportHeight="24">
               <path android:fillColor="#8A9DA0" android:pathData="M3,17.25L3,21h3.75L17.81,9.94l-3.75,-3.75zM20.71,7.04c0.39,-0.39 0.39,-1.02 0,-1.41l-2.34,-2.34c-0.39,-0.39 -1.02,-0.39 -1.41,0l-1.83,1.83 3.75,3.75z" />
           </vector>
-          SPOT_EOF_37
+          SPOT_EOF_41
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_expand_more.xml <<'SPOT_EOF_38'
+          cat > app/src/main/res/drawable/ic_expand_more.xml <<'SPOT_EOF_42'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="22dp" android:height="22dp"
               android:viewportWidth="24" android:viewportHeight="24">
               <path android:fillColor="#8A9DA0" android:pathData="M16.59,8.59L12,13.17 7.41,8.59 6,10l6,6 6,-6z" />
           </vector>
-          SPOT_EOF_38
+          SPOT_EOF_42
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_launcher_foreground.xml <<'SPOT_EOF_39'
+          cat > app/src/main/res/drawable/ic_launcher_foreground.xml <<'SPOT_EOF_43'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="108dp" android:height="108dp"
@@ -3026,45 +3153,45 @@ jobs:
                   android:fillColor="#0F3B4C"
                   android:pathData="M54,41a7,7 0 1,0 0.01,0z" />
           </vector>
-          SPOT_EOF_39
+          SPOT_EOF_43
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_nav_home.xml <<'SPOT_EOF_40'
+          cat > app/src/main/res/drawable/ic_nav_home.xml <<'SPOT_EOF_44'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
               android:viewportWidth="24" android:viewportHeight="24">
               <path android:fillColor="#FFFFFF" android:pathData="M10,20v-6h4v6h5v-8h3L12,3 2,12h3v8z" />
           </vector>
-          SPOT_EOF_40
+          SPOT_EOF_44
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_nav_list.xml <<'SPOT_EOF_41'
+          cat > app/src/main/res/drawable/ic_nav_list.xml <<'SPOT_EOF_45'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
               android:viewportWidth="24" android:viewportHeight="24">
               <path android:fillColor="#FFFFFF" android:pathData="M4,7h2v2L4,9zM4,11h2v2L4,13zM4,15h2v2L4,17zM8,7h12v2L8,9zM8,11h12v2L8,13zM8,15h12v2L8,17z" />
           </vector>
-          SPOT_EOF_41
+          SPOT_EOF_45
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_nav_profile.xml <<'SPOT_EOF_42'
+          cat > app/src/main/res/drawable/ic_nav_profile.xml <<'SPOT_EOF_46'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
               android:viewportWidth="24" android:viewportHeight="24">
               <path android:fillColor="#FFFFFF" android:pathData="M12,12c2.21,0 4,-1.79 4,-4s-1.79,-4 -4,-4 -4,1.79 -4,4 1.79,4 4,4zM12,14c-2.67,0 -8,1.34 -8,4v2h16v-2c0,-2.66 -5.33,-4 -8,-4z" />
           </vector>
-          SPOT_EOF_42
+          SPOT_EOF_46
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_nav_stats.xml <<'SPOT_EOF_43'
+          cat > app/src/main/res/drawable/ic_nav_stats.xml <<'SPOT_EOF_47'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
               android:viewportWidth="24" android:viewportHeight="24">
               <path android:fillColor="#FFFFFF" android:pathData="M5,9.2h3L8,19L5,19zM10.6,5h3L13.6,19h-3zM16.2,13h3L19.2,19h-3z" />
           </vector>
-          SPOT_EOF_43
+          SPOT_EOF_47
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_person.xml <<'SPOT_EOF_44'
+          cat > app/src/main/res/drawable/ic_person.xml <<'SPOT_EOF_48'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
@@ -3073,18 +3200,27 @@ jobs:
                   android:fillColor="#FFFFFF"
                   android:pathData="M12,12c2.21,0 4,-1.79 4,-4s-1.79,-4 -4,-4 -4,1.79 -4,4 1.79,4 4,4zM12,14c-2.67,0 -8,1.34 -8,4v2h16v-2c0,-2.66 -5.33,-4 -8,-4z" />
           </vector>
-          SPOT_EOF_44
+          SPOT_EOF_48
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_pin_small.xml <<'SPOT_EOF_45'
+          cat > app/src/main/res/drawable/ic_pin_small.xml <<'SPOT_EOF_49'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="18dp" android:height="18dp"
               android:viewportWidth="24" android:viewportHeight="24">
               <path android:fillColor="#FFFFFF" android:pathData="M12,2a7,7 0 0,0 -7,7c0,5.2 7,13 7,13s7,-7.8 7,-13a7,7 0 0,0 -7,-7zM12,11.5a2.5,2.5 0 1,1 0,-5a2.5,2.5 0 0,1 0,5z" />
           </vector>
-          SPOT_EOF_45
+          SPOT_EOF_49
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_settings.xml <<'SPOT_EOF_46'
+          cat > app/src/main/res/drawable/ic_search.xml <<'SPOT_EOF_50'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="20dp" android:height="20dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#6B7280" android:pathData="M15.5,14h-0.79l-0.28,-0.27C15.41,12.59 16,11.11 16,9.5 16,5.91 13.09,3 9.5,3S3,5.91 3,9.5 5.91,16 9.5,16c1.61,0 3.09,-0.59 4.23,-1.57l0.27,0.28v0.79l5,4.99L20.49,19zM9.5,14C7.01,14 5,11.99 5,9.5S7.01,5 9.5,5 14,7.01 14,9.5 11.99,14 9.5,14z" />
+          </vector>
+          SPOT_EOF_50
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/ic_settings.xml <<'SPOT_EOF_51'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
@@ -3093,18 +3229,18 @@ jobs:
                   android:fillColor="#8A9DA0"
                   android:pathData="M19.14,12.94c0.04,-0.3 0.06,-0.61 0.06,-0.94c0,-0.32 -0.02,-0.64 -0.07,-0.94l2.03,-1.58c0.18,-0.14 0.23,-0.41 0.12,-0.61l-1.92,-3.32c-0.12,-0.22 -0.37,-0.29 -0.59,-0.22l-2.39,0.96c-0.5,-0.38 -1.03,-0.7 -1.62,-0.94L14.4,2.81c-0.04,-0.24 -0.24,-0.41 -0.48,-0.41h-3.84c-0.24,0 -0.43,0.17 -0.47,0.41L9.25,5.35C8.66,5.59 8.12,5.92 7.63,6.29L5.24,5.33c-0.22,-0.08 -0.47,0 -0.59,0.22L2.74,8.87C2.62,9.08 2.66,9.34 2.86,9.48l2.03,1.58C4.84,11.36 4.8,11.69 4.8,12s0.02,0.64 0.07,0.94l-2.03,1.58c-0.18,0.14 -0.23,0.41 -0.12,0.61l1.92,3.32c0.12,0.22 0.37,0.29 0.59,0.22l2.39,-0.96c0.5,0.38 1.03,0.7 1.62,0.94l0.36,2.54c0.05,0.24 0.24,0.41 0.48,0.41h3.84c0.24,0 0.44,-0.17 0.47,-0.41l0.36,-2.54c0.59,-0.24 1.13,-0.56 1.62,-0.94l2.39,0.96c0.22,0.08 0.47,0 0.59,-0.22l1.92,-3.32c0.12,-0.22 0.07,-0.47 -0.12,-0.61L19.14,12.94zM12,15.6c-1.98,0 -3.6,-1.62 -3.6,-3.6s1.62,-3.6 3.6,-3.6s3.6,1.62 3.6,3.6S13.98,15.6 12,15.6z" />
           </vector>
-          SPOT_EOF_46
+          SPOT_EOF_51
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_share.xml <<'SPOT_EOF_47'
+          cat > app/src/main/res/drawable/ic_share.xml <<'SPOT_EOF_52'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
               android:viewportWidth="24" android:viewportHeight="24">
               <path android:fillColor="#FFFFFF" android:pathData="M18,16.08c-0.76,0 -1.44,0.3 -1.96,0.77L8.91,12.7c0.05,-0.23 0.09,-0.46 0.09,-0.7s-0.04,-0.47 -0.09,-0.7l7.05,-4.11c0.54,0.5 1.25,0.81 2.04,0.81 1.66,0 3,-1.34 3,-3s-1.34,-3 -3,-3 -3,1.34 -3,3c0,0.24 0.04,0.47 0.09,0.7L7.04,9.81C6.5,9.31 5.79,9 5,9c-1.66,0 -3,1.34 -3,3s1.34,3 3,3c0.79,0 1.5,-0.31 2.04,-0.81l7.12,4.16c-0.05,0.21 -0.08,0.43 -0.08,0.65 0,1.61 1.31,2.92 2.92,2.92 1.61,0 2.92,-1.31 2.92,-2.92s-1.31,-2.92 -2.92,-2.92z" />
           </vector>
-          SPOT_EOF_47
+          SPOT_EOF_52
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_stat_pin.xml <<'SPOT_EOF_48'
+          cat > app/src/main/res/drawable/ic_stat_pin.xml <<'SPOT_EOF_53'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
@@ -3113,11 +3249,12 @@ jobs:
                   android:fillColor="#FFFFFFFF"
                   android:pathData="M12,2a7,7 0 0,0 -7,7c0,5.2 7,13 7,13s7,-7.8 7,-13a7,7 0 0,0 -7,-7zM12,11.5a2.5,2.5 0 1,1 0,-5a2.5,2.5 0 0,1 0,5z" />
           </vector>
-          SPOT_EOF_48
+          SPOT_EOF_53
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_main.xml <<'SPOT_EOF_49'
+          cat > app/src/main/res/layout/activity_main.xml <<'SPOT_EOF_54'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:app="http://schemas.android.com/apk/res-auto"
               xmlns:tools="http://schemas.android.com/tools"
               android:layout_width="match_parent"
               android:layout_height="match_parent"
@@ -3141,38 +3278,218 @@ jobs:
                       android:gravity="center_vertical"
                       android:orientation="horizontal">
 
+                      <ImageView
+                          android:id="@+id/homeAvatar"
+                          android:layout_width="42dp"
+                          android:layout_height="42dp"
+                          android:background="@drawable/bg_avatar"
+                          android:contentDescription="Your profile"
+                          android:padding="9dp"
+                          android:src="@drawable/ic_person" />
+
                       <LinearLayout
                           android:layout_width="0dp"
                           android:layout_height="wrap_content"
+                          android:layout_marginStart="10dp"
                           android:layout_weight="1"
                           android:orientation="vertical">
 
                           <TextView
+                              android:id="@+id/greetingName"
                               android:layout_width="wrap_content"
                               android:layout_height="wrap_content"
-                              android:text="Spot Reminder"
+                              android:text="Hi, Traveler"
                               android:textColor="@color/ink"
-                              android:textSize="24sp"
+                              android:textSize="18sp"
                               android:textStyle="bold" />
 
                           <TextView
                               android:layout_width="wrap_content"
                               android:layout_height="wrap_content"
-                              android:layout_marginTop="2dp"
-                              android:text="Save the places you want to see. Get reminded when you arrive."
+                              android:text="Where are you headed?"
                               android:textColor="@color/river_soft"
                               android:textSize="13sp" />
                       </LinearLayout>
 
                       <ImageButton
+                          android:id="@+id/btnBell"
+                          android:layout_width="40dp"
+                          android:layout_height="40dp"
+                          android:background="@drawable/bg_category_circle"
+                          android:contentDescription="Notifications"
+                          android:padding="9dp"
+                          android:src="@drawable/ic_bell" />
+
+                      <ImageButton
                           android:id="@+id/btnSettings"
-                          android:layout_width="44dp"
-                          android:layout_height="44dp"
+                          android:layout_width="40dp"
+                          android:layout_height="40dp"
+                          android:layout_marginStart="8dp"
                           android:background="?attr/selectableItemBackgroundBorderless"
                           android:contentDescription="Settings"
                           android:padding="8dp"
                           android:src="@drawable/ic_settings" />
                   </LinearLayout>
+
+                  <!-- Search bar (jumps to the Spots tab) -->
+                  <LinearLayout
+                      android:id="@+id/homeSearchBar"
+                      android:layout_width="match_parent"
+                      android:layout_height="50dp"
+                      android:layout_marginTop="14dp"
+                      android:background="@drawable/bg_search_pill"
+                      android:gravity="center_vertical"
+                      android:orientation="horizontal"
+                      android:paddingStart="16dp"
+                      android:paddingEnd="16dp">
+
+                      <ImageView
+                          android:layout_width="18dp"
+                          android:layout_height="18dp"
+                          android:contentDescription="Search"
+                          android:src="@drawable/ic_search" />
+
+                      <TextView
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:layout_marginStart="10dp"
+                          android:layout_weight="1"
+                          android:text="Search your saved spots"
+                          android:textColor="@color/river_soft"
+                          android:textSize="14sp" />
+                  </LinearLayout>
+
+                  <!-- Quick actions -->
+                  <LinearLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="16dp"
+                      android:orientation="horizontal">
+
+                      <LinearLayout
+                          android:id="@+id/quickAdd"
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:layout_weight="1"
+                          android:gravity="center_horizontal"
+                          android:orientation="vertical">
+
+                          <ImageView
+                              android:layout_width="48dp"
+                              android:layout_height="48dp"
+                              android:background="@drawable/bg_category_circle"
+                              android:padding="13dp"
+                              android:src="@drawable/ic_add"
+                              app:tint="@color/accent" />
+
+                          <TextView
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:layout_marginTop="4dp"
+                              android:text="Add spot"
+                              android:textColor="@color/ink"
+                              android:textSize="11sp" />
+                      </LinearLayout>
+
+                      <LinearLayout
+                          android:id="@+id/quickTrip"
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:layout_weight="1"
+                          android:gravity="center_horizontal"
+                          android:orientation="vertical">
+
+                          <ImageView
+                              android:layout_width="48dp"
+                              android:layout_height="48dp"
+                              android:background="@drawable/bg_category_circle"
+                              android:padding="13dp"
+                              android:src="@drawable/ic_stat_pin"
+                              app:tint="@color/accent" />
+
+                          <TextView
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:layout_marginTop="4dp"
+                              android:text="Start trip"
+                              android:textColor="@color/ink"
+                              android:textSize="11sp" />
+                      </LinearLayout>
+
+                      <LinearLayout
+                          android:id="@+id/quickSpots"
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:layout_weight="1"
+                          android:gravity="center_horizontal"
+                          android:orientation="vertical">
+
+                          <ImageView
+                              android:layout_width="48dp"
+                              android:layout_height="48dp"
+                              android:background="@drawable/bg_category_circle"
+                              android:padding="13dp"
+                              android:src="@drawable/ic_nav_list"
+                              app:tint="@color/accent" />
+
+                          <TextView
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:layout_marginTop="4dp"
+                              android:text="My spots"
+                              android:textColor="@color/ink"
+                              android:textSize="11sp" />
+                      </LinearLayout>
+
+                      <LinearLayout
+                          android:id="@+id/quickStats"
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:layout_weight="1"
+                          android:gravity="center_horizontal"
+                          android:orientation="vertical">
+
+                          <ImageView
+                              android:layout_width="48dp"
+                              android:layout_height="48dp"
+                              android:background="@drawable/bg_category_circle"
+                              android:padding="13dp"
+                              android:src="@drawable/ic_nav_stats"
+                              app:tint="@color/accent" />
+
+                          <TextView
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:layout_marginTop="4dp"
+                              android:text="Stats"
+                              android:textColor="@color/ink"
+                              android:textSize="11sp" />
+                      </LinearLayout>
+                  </LinearLayout>
+
+                  <!-- Upcoming spots (not yet visited) -->
+                  <TextView
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="20dp"
+                      android:text="Upcoming spots"
+                      android:textColor="@color/ink"
+                      android:textSize="16sp"
+                      android:textStyle="bold" />
+
+                  <HorizontalScrollView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="8dp"
+                      android:clipToPadding="false"
+                      android:scrollbars="none">
+
+                      <LinearLayout
+                          android:id="@+id/upcomingList"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:orientation="horizontal" />
+                  </HorizontalScrollView>
 
                   <!-- Permission nudge, only shown when something needs attention -->
                   <LinearLayout
@@ -3247,7 +3564,7 @@ jobs:
                           android:layout_marginTop="2dp"
                           android:text="Check now"
                           android:textAllCaps="false"
-                          android:textColor="@color/saffron" />
+                          android:textColor="@color/accent" />
                   </LinearLayout>
 
                   <!-- Arrival reminder -->
@@ -3265,7 +3582,7 @@ jobs:
                           android:id="@+id/remindTitle"
                           android:layout_width="match_parent"
                           android:layout_height="wrap_content"
-                          android:textColor="@color/river"
+                          android:textColor="@android:color/white"
                           android:textSize="16sp"
                           android:textStyle="bold" />
 
@@ -3281,8 +3598,10 @@ jobs:
                           android:layout_width="wrap_content"
                           android:layout_height="40dp"
                           android:layout_marginTop="4dp"
+                          android:backgroundTint="@android:color/white"
                           android:text="Got it"
                           android:textAllCaps="false"
+                          android:textColor="@color/accent"
                           android:textSize="13sp" />
                   </LinearLayout>
 
@@ -3414,9 +3733,9 @@ jobs:
 
               <include layout="@layout/bottom_nav" />
           </LinearLayout>
-          SPOT_EOF_49
+          SPOT_EOF_54
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_map.xml <<'SPOT_EOF_50'
+          cat > app/src/main/res/layout/activity_map.xml <<'SPOT_EOF_55'
           <?xml version="1.0" encoding="utf-8"?>
           <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
@@ -3520,17 +3839,17 @@ jobs:
                       android:layout_width="match_parent"
                       android:layout_height="48dp"
                       android:layout_marginTop="8dp"
-                      android:backgroundTint="@color/saffron"
+                      android:backgroundTint="@color/accent"
                       android:enabled="false"
                       android:text="Use this city"
                       android:textAllCaps="false"
-                      android:textColor="@color/river"
+                      android:textColor="@android:color/white"
                       android:textSize="15sp" />
               </LinearLayout>
           </FrameLayout>
-          SPOT_EOF_50
+          SPOT_EOF_55
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_profile.xml <<'SPOT_EOF_51'
+          cat > app/src/main/res/layout/activity_profile.xml <<'SPOT_EOF_56'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
@@ -3802,9 +4121,9 @@ jobs:
 
               <include layout="@layout/bottom_nav" />
           </LinearLayout>
-          SPOT_EOF_51
+          SPOT_EOF_56
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_settings.xml <<'SPOT_EOF_52'
+          cat > app/src/main/res/layout/activity_settings.xml <<'SPOT_EOF_57'
           <?xml version="1.0" encoding="utf-8"?>
           <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
@@ -3980,9 +4299,9 @@ jobs:
                       android:textSize="12sp" />
               </LinearLayout>
           </ScrollView>
-          SPOT_EOF_52
+          SPOT_EOF_57
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_spot_detail.xml <<'SPOT_EOF_53'
+          cat > app/src/main/res/layout/activity_spot_detail.xml <<'SPOT_EOF_58'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
@@ -4056,7 +4375,7 @@ jobs:
                                   android:layout_width="wrap_content"
                                   android:layout_height="wrap_content"
                                   android:text="TOTAL SPENT"
-                                  android:textColor="@color/river"
+                                  android:textColor="@android:color/white"
                                   android:textSize="11sp"
                                   android:textStyle="bold" />
 
@@ -4064,7 +4383,7 @@ jobs:
                                   android:id="@+id/totalCost"
                                   android:layout_width="wrap_content"
                                   android:layout_height="wrap_content"
-                                  android:textColor="@color/river"
+                                  android:textColor="@android:color/white"
                                   android:textSize="26sp"
                                   android:textStyle="bold" />
                           </LinearLayout>
@@ -4115,9 +4434,9 @@ jobs:
                   </LinearLayout>
               </ScrollView>
           </LinearLayout>
-          SPOT_EOF_53
+          SPOT_EOF_58
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_spots.xml <<'SPOT_EOF_54'
+          cat > app/src/main/res/layout/activity_spots.xml <<'SPOT_EOF_59'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
@@ -4183,10 +4502,10 @@ jobs:
                               android:layout_width="wrap_content"
                               android:layout_height="40dp"
                               android:layout_marginTop="6dp"
-                              android:backgroundTint="@color/saffron"
+                              android:backgroundTint="@color/accent"
                               android:text="End trip"
                               android:textAllCaps="false"
-                              android:textColor="@color/river" />
+                              android:textColor="@android:color/white" />
                       </LinearLayout>
 
                       <LinearLayout
@@ -4201,9 +4520,9 @@ jobs:
 
               <include layout="@layout/bottom_nav" />
           </LinearLayout>
-          SPOT_EOF_54
+          SPOT_EOF_59
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_stats.xml <<'SPOT_EOF_55'
+          cat > app/src/main/res/layout/activity_stats.xml <<'SPOT_EOF_60'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
@@ -4256,7 +4575,7 @@ jobs:
                                   android:layout_width="wrap_content"
                                   android:layout_height="wrap_content"
                                   android:text="TOTAL SPENT"
-                                  android:textColor="@color/river"
+                                  android:textColor="@android:color/white"
                                   android:textSize="11sp"
                                   android:textStyle="bold" />
 
@@ -4264,7 +4583,7 @@ jobs:
                                   android:id="@+id/statTotalCost"
                                   android:layout_width="wrap_content"
                                   android:layout_height="wrap_content"
-                                  android:textColor="@color/river"
+                                  android:textColor="@android:color/white"
                                   android:textSize="26sp"
                                   android:textStyle="bold" />
                           </LinearLayout>
@@ -4342,9 +4661,9 @@ jobs:
 
               <include layout="@layout/bottom_nav" />
           </LinearLayout>
-          SPOT_EOF_55
+          SPOT_EOF_60
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_trip_map.xml <<'SPOT_EOF_56'
+          cat > app/src/main/res/layout/activity_trip_map.xml <<'SPOT_EOF_61'
           <?xml version="1.0" encoding="utf-8"?>
           <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
@@ -4406,15 +4725,15 @@ jobs:
                       android:layout_width="match_parent"
                       android:layout_height="46dp"
                       android:layout_marginTop="8dp"
-                      android:backgroundTint="@color/saffron"
+                      android:backgroundTint="@color/accent"
                       android:text="Share this route"
                       android:textAllCaps="false"
-                      android:textColor="@color/river" />
+                      android:textColor="@android:color/white" />
               </LinearLayout>
           </FrameLayout>
-          SPOT_EOF_56
+          SPOT_EOF_61
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/bottom_nav.xml <<'SPOT_EOF_57'
+          cat > app/src/main/res/layout/bottom_nav.xml <<'SPOT_EOF_62'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
@@ -4523,73 +4842,79 @@ jobs:
                       android:textSize="11sp" />
               </LinearLayout>
           </LinearLayout>
-          SPOT_EOF_57
+          SPOT_EOF_62
           mkdir -p app/src/main/res/mipmap-anydpi-v26
-          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml <<'SPOT_EOF_58'
+          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml <<'SPOT_EOF_63'
           <?xml version="1.0" encoding="utf-8"?>
           <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
               <background android:drawable="@color/river" />
               <foreground android:drawable="@drawable/ic_launcher_foreground" />
           </adaptive-icon>
-          SPOT_EOF_58
+          SPOT_EOF_63
           mkdir -p app/src/main/res/values-night
-          cat > app/src/main/res/values-night/colors.xml <<'SPOT_EOF_59'
+          cat > app/src/main/res/values-night/colors.xml <<'SPOT_EOF_64'
           <resources>
               <!-- A layered dark palette: background darkest, cards a step lighter, fields a step
                    lighter again, so surfaces read as distinct instead of blending together. -->
-              <color name="sea">#0B171C</color>
-              <color name="sea_deep">#101F25</color>
-              <color name="river">#1B5068</color>
-              <color name="ink">#ECF2F1</color>
-              <color name="river_soft">#9FB4B9</color>
-              <color name="river_light">#BFE0E8</color>
-              <color name="saffron">#F2A516</color>
-              <color name="paper">#142229</color>
-              <color name="field">#1C2E36</color>
-              <color name="field_stroke">#33505A</color>
-              <color name="brick">#FF8A75</color>
-              <color name="line">#243740</color>
+              <color name="sea">#10131C</color>
+              <color name="sea_deep">#161A26</color>
+              <color name="river">#24345E</color>
+              <color name="ink">#EDEFF7</color>
+              <color name="river_soft">#9AA3B8</color>
+              <color name="river_light">#C7D0E8</color>
+              <color name="saffron">#FFB020</color>
+              <color name="paper">#1A1E2B</color>
+              <color name="field">#232838</color>
+              <color name="field_stroke">#333B52</color>
+              <color name="brick">#FF6B6B</color>
+              <color name="line">#2A3040</color>
+              <color name="accent">#6C86FF</color>
+              <color name="accent_soft">#232C4A</color>
           </resources>
-          SPOT_EOF_59
+          SPOT_EOF_64
           mkdir -p app/src/main/res/values-night
-          cat > app/src/main/res/values-night/themes.xml <<'SPOT_EOF_60'
+          cat > app/src/main/res/values-night/themes.xml <<'SPOT_EOF_65'
           <resources>
               <style name="Theme.SpotReminder" parent="Theme.Material3.DayNight.NoActionBar">
-                  <item name="colorPrimary">@color/river</item>
-                  <item name="colorOnPrimary">@color/sea</item>
-                  <item name="colorSecondary">@color/saffron</item>
+                  <item name="colorPrimary">@color/accent</item>
+                  <item name="colorOnPrimary">@android:color/white</item>
+                  <item name="colorSecondary">@color/accent</item>
+                  <item name="colorSurface">@color/paper</item>
+                  <item name="colorOnSurface">@color/ink</item>
                   <item name="android:windowBackground">@color/sea</item>
                   <item name="android:statusBarColor">@color/sea</item>
                   <item name="android:navigationBarColor">@color/sea</item>
                   <item name="android:windowLightStatusBar">false</item>
               </style>
           </resources>
-          SPOT_EOF_60
+          SPOT_EOF_65
           mkdir -p app/src/main/res/values
-          cat > app/src/main/res/values/colors.xml <<'SPOT_EOF_61'
+          cat > app/src/main/res/values/colors.xml <<'SPOT_EOF_66'
           <resources>
-              <color name="sea">#E4F1EE</color>
-              <color name="sea_deep">#CFE4DF</color>
-              <color name="river">#0F3B4C</color>
-              <color name="ink">#0F3B4C</color>
-              <color name="river_soft">#3F6572</color>
-              <color name="river_light">#B8D7DF</color>
-              <color name="saffron">#F2A516</color>
-              <color name="paper">#FBFDFC</color>
-              <color name="field">#EAF4F1</color>
-              <color name="field_stroke">#A9CCC5</color>
-              <color name="brick">#B23A2E</color>
-              <color name="line">#B9D3CD</color>
+              <color name="sea">#F5F6FA</color>
+              <color name="sea_deep">#ECEEF5</color>
+              <color name="river">#1E2A4A</color>
+              <color name="ink">#16213A</color>
+              <color name="river_soft">#6B7280</color>
+              <color name="river_light">#C7D0E8</color>
+              <color name="saffron">#FFB020</color>
+              <color name="paper">#FFFFFF</color>
+              <color name="field">#F1F2F6</color>
+              <color name="field_stroke">#D8DBE3</color>
+              <color name="brick">#E5484D</color>
+              <color name="line">#E4E6EE</color>
+              <color name="accent">#4C63E0</color>
+              <color name="accent_soft">#EDF0FE</color>
           </resources>
-          SPOT_EOF_61
+          SPOT_EOF_66
           mkdir -p app/src/main/res/values
-          cat > app/src/main/res/values/strings.xml <<'SPOT_EOF_62'
+          cat > app/src/main/res/values/strings.xml <<'SPOT_EOF_67'
           <resources>
               <string name="app_name">Spot Reminder</string>
           </resources>
-          SPOT_EOF_62
+          SPOT_EOF_67
           mkdir -p app/src/main/res/values
-          cat > app/src/main/res/values/styles.xml <<'SPOT_EOF_63'
+          cat > app/src/main/res/values/styles.xml <<'SPOT_EOF_68'
           <resources>
               <style name="ShapeAppearanceOverlay.SpotReminder.TextField" parent="">
                   <item name="cornerFamily">rounded</item>
@@ -4606,28 +4931,30 @@ jobs:
                   <item name="colorControlNormal">@color/field_stroke</item>
               </style>
           </resources>
-          SPOT_EOF_63
+          SPOT_EOF_68
           mkdir -p app/src/main/res/values
-          cat > app/src/main/res/values/themes.xml <<'SPOT_EOF_64'
+          cat > app/src/main/res/values/themes.xml <<'SPOT_EOF_69'
           <resources>
               <style name="Theme.SpotReminder" parent="Theme.Material3.DayNight.NoActionBar">
-                  <item name="colorPrimary">@color/river</item>
+                  <item name="colorPrimary">@color/accent</item>
                   <item name="colorOnPrimary">@android:color/white</item>
-                  <item name="colorSecondary">@color/saffron</item>
+                  <item name="colorSecondary">@color/accent</item>
+                  <item name="colorSurface">@color/paper</item>
+                  <item name="colorOnSurface">@color/ink</item>
                   <item name="android:windowBackground">@color/sea</item>
                   <item name="android:statusBarColor">@color/sea</item>
                   <item name="android:navigationBarColor">@color/sea</item>
                   <item name="android:windowLightStatusBar">true</item>
               </style>
           </resources>
-          SPOT_EOF_64
+          SPOT_EOF_69
           mkdir -p app/src/main/res/xml
-          cat > app/src/main/res/xml/file_paths.xml <<'SPOT_EOF_65'
+          cat > app/src/main/res/xml/file_paths.xml <<'SPOT_EOF_70'
           <?xml version="1.0" encoding="utf-8"?>
           <paths xmlns:android="http://schemas.android.com/apk/res/android">
               <cache-path name="trip_maps" path="trip_maps/" />
           </paths>
-          SPOT_EOF_65
+          SPOT_EOF_70
 
       - uses: actions/setup-java@v4
         with:
