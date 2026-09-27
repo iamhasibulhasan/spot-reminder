@@ -122,6 +122,8 @@ jobs:
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
               <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
               <application
                   android:name=".App"
@@ -141,6 +143,26 @@ jobs:
                       </intent-filter>
                   </activity>
                   <activity
+                      android:name=".SpotsActivity"
+                      android:exported="false"
+                      android:label="Spots" />
+                  <activity
+                      android:name=".SpotDetailActivity"
+                      android:exported="false"
+                      android:label="Spot" />
+                  <activity
+                      android:name=".StatsActivity"
+                      android:exported="false"
+                      android:label="Stats" />
+                  <activity
+                      android:name=".ProfileActivity"
+                      android:exported="false"
+                      android:label="Profile" />
+                  <activity
+                      android:name=".TripMapActivity"
+                      android:exported="false"
+                      android:label="Trip route" />
+                  <activity
                       android:name=".SettingsActivity"
                       android:exported="false"
                       android:label="Settings"
@@ -149,6 +171,21 @@ jobs:
                       android:name=".MapPickerActivity"
                       android:exported="false"
                       android:label="Pick a city" />
+
+                  <service
+                      android:name=".TripTrackingService"
+                      android:exported="false"
+                      android:foregroundServiceType="location" />
+
+                  <provider
+                      android:name="androidx.core.content.FileProvider"
+                      android:authorities="${applicationId}.fileprovider"
+                      android:exported="false"
+                      android:grantUriPermissions="true">
+                      <meta-data
+                          android:name="android.support.FILE_PROVIDER_PATHS"
+                          android:resource="@xml/file_paths" />
+                  </provider>
               </application>
           </manifest>
           SPOT_EOF_5
@@ -178,7 +215,60 @@ jobs:
           }
           SPOT_EOF_6
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/DriveBackup.kt <<'SPOT_EOF_7'
+          cat > app/src/main/java/com/spotreminder/app/BottomNav.kt <<'SPOT_EOF_7'
+          package com.spotreminder.app
+
+          import android.content.Intent
+          import androidx.appcompat.app.AppCompatActivity
+          import android.widget.ImageView
+          import android.widget.TextView
+          import androidx.core.content.ContextCompat
+
+          /** Wires the <include layout="@layout/bottom_nav"/> bar included in each tab's screen. */
+          object BottomNav {
+
+              enum class Tab { HOME, SPOTS, STATS, PROFILE }
+
+              fun setup(activity: AppCompatActivity, current: Tab) {
+                  val selected = ContextCompat.getColor(activity, R.color.saffron)
+                  val unselected = ContextCompat.getColor(activity, R.color.river_soft)
+
+                  fun style(iconId: Int, labelId: Int, tab: Tab) {
+                      val icon = activity.findViewById<ImageView>(iconId)
+                      val label = activity.findViewById<TextView>(labelId)
+                      val color = if (tab == current) selected else unselected
+                      icon.setColorFilter(color)
+                      label.setTextColor(color)
+                  }
+                  style(R.id.navHomeIcon, R.id.navHomeLabel, Tab.HOME)
+                  style(R.id.navSpotsIcon, R.id.navSpotsLabel, Tab.SPOTS)
+                  style(R.id.navStatsIcon, R.id.navStatsLabel, Tab.STATS)
+                  style(R.id.navProfileIcon, R.id.navProfileLabel, Tab.PROFILE)
+
+                  fun go(tab: Tab, cls: Class<*>) {
+                      activity.findViewById<android.view.View>(
+                          when (tab) {
+                              Tab.HOME -> R.id.navHome
+                              Tab.SPOTS -> R.id.navSpots
+                              Tab.STATS -> R.id.navStats
+                              Tab.PROFILE -> R.id.navProfile
+                          }
+                      ).setOnClickListener {
+                          if (tab != current) {
+                              activity.startActivity(Intent(activity, cls))
+                              activity.finish()
+                          }
+                      }
+                  }
+                  go(Tab.HOME, MainActivity::class.java)
+                  go(Tab.SPOTS, SpotsActivity::class.java)
+                  go(Tab.STATS, StatsActivity::class.java)
+                  go(Tab.PROFILE, ProfileActivity::class.java)
+              }
+          }
+          SPOT_EOF_7
+          mkdir -p app/src/main/java/com/spotreminder/app
+          cat > app/src/main/java/com/spotreminder/app/DriveBackup.kt <<'SPOT_EOF_8'
           package com.spotreminder.app
 
           import android.content.Context
@@ -283,9 +373,9 @@ jobs:
                   return c.inputStream.bufferedReader().use { it.readText() }
               }
           }
-          SPOT_EOF_7
+          SPOT_EOF_8
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/LocationChecker.kt <<'SPOT_EOF_8'
+          cat > app/src/main/java/com/spotreminder/app/LocationChecker.kt <<'SPOT_EOF_9'
           package com.spotreminder.app
 
           import android.annotation.SuppressLint
@@ -459,9 +549,9 @@ jobs:
                   return out
               }
           }
-          SPOT_EOF_8
+          SPOT_EOF_9
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/LocationWorker.kt <<'SPOT_EOF_9'
+          cat > app/src/main/java/com/spotreminder/app/LocationWorker.kt <<'SPOT_EOF_10'
           package com.spotreminder.app
 
           import android.content.Context
@@ -477,9 +567,9 @@ jobs:
                   return Result.success()
               }
           }
-          SPOT_EOF_9
+          SPOT_EOF_10
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/MainActivity.kt <<'SPOT_EOF_10'
+          cat > app/src/main/java/com/spotreminder/app/MainActivity.kt <<'SPOT_EOF_11'
           package com.spotreminder.app
 
           import android.content.Intent
@@ -522,7 +612,6 @@ jobs:
               private lateinit var spotLayout: TextInputLayout
               private lateinit var cityInput: android.widget.AutoCompleteTextView
               private lateinit var spotInput: android.widget.AutoCompleteTextView
-              private lateinit var savedList: LinearLayout
 
               private val io = Executors.newSingleThreadExecutor()
               private var checking = false
@@ -576,7 +665,8 @@ jobs:
                   spotLayout = findViewById(R.id.spotLayout)
                   cityInput = findViewById(R.id.cityInput)
                   spotInput = findViewById(R.id.spotInput)
-                  savedList = findViewById(R.id.savedList)
+
+                  BottomNav.setup(this, BottomNav.Tab.HOME)
 
                   cityAdapter = NoFilterAdapter(this)
                   spotAdapter = NoFilterAdapter(this)
@@ -649,7 +739,6 @@ jobs:
                   }
 
                   Notifier.ensureChannel(this)
-                  renderSaved()
               }
 
               override fun onResume() {
@@ -715,7 +804,6 @@ jobs:
                   }
                   if (currentKey != dismissedKey) dismissedKey = null
                   renderReminder()
-                  renderSaved()
               }
 
               private fun recomputeMatch() {
@@ -757,7 +845,6 @@ jobs:
                   // If you are already in this city, show its reminder right away
                   dismissedKey = null
                   recomputeMatch()
-                  renderSaved()
               }
 
               private fun fetchCitySuggestions(query: String) {
@@ -790,14 +877,6 @@ jobs:
 
               private fun color(id: Int) = ContextCompat.getColor(this, id)
 
-              private fun textButton(label: String, onClick: () -> Unit): MaterialButton =
-                  MaterialButton(this, null, android.R.attr.borderlessButtonStyle).apply {
-                      text = label
-                      isAllCaps = false
-                      setTextColor(color(R.color.brick))
-                      setOnClickListener { onClick() }
-                  }
-
               private fun renderReminder() {
                   val key = currentKey
                   val city = Store.load(this).firstOrNull { it.key == key }
@@ -826,133 +905,10 @@ jobs:
                       remindList.addView(cb)
                   }
               }
-
-              private fun renderSaved() {
-                  savedList.removeAllViews()
-                  val cities = Store.load(this)
-                  if (cities.isEmpty()) {
-                      savedList.addView(TextView(this).apply {
-                          text = "Nothing saved yet. Add a city and a spot above."
-                          setTextColor(color(R.color.river_soft))
-                          setPadding(dp(4), dp(16), dp(4), dp(16))
-                      })
-                      return
-                  }
-                  for (c in cities) {
-                      val here = c.key == currentKey
-                      val card = LinearLayout(this).apply {
-                          orientation = LinearLayout.VERTICAL
-                          background = ContextCompat.getDrawable(
-                              this@MainActivity, if (here) R.drawable.bg_current else R.drawable.bg_paper
-                          )
-                          setPadding(dp(16), dp(10), dp(8), dp(10))
-                          layoutParams = LinearLayout.LayoutParams(
-                              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-                          ).apply { topMargin = dp(12) }
-                      }
-
-                      val head = LinearLayout(this).apply {
-                          orientation = LinearLayout.HORIZONTAL
-                          gravity = Gravity.CENTER_VERTICAL
-                      }
-                      head.addView(TextView(this).apply {
-                          text = c.name + if (here) "  (you are here)" else ""
-                          textSize = 17f
-                          setTypeface(typeface, Typeface.BOLD)
-                          setTextColor(color(R.color.ink))
-                          layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                      })
-                      head.addView(textButton("Remove city") {
-                          AlertDialog.Builder(this)
-                              .setTitle("Remove " + c.name + "?")
-                              .setMessage("This deletes the city and all its spots.")
-                              .setPositiveButton("Remove") { _, _ ->
-                                  val all = Store.load(this)
-                                  all.removeAll { it.key == c.key }
-                                  Store.save(this, all)
-                                  recomputeMatch()
-                                  renderReminder()
-                                  renderSaved()
-                              }
-                              .setNegativeButton("Cancel", null)
-                              .show()
-                      })
-                      card.addView(head)
-
-                      for (s in c.spots) {
-                          val row = LinearLayout(this).apply {
-                              orientation = LinearLayout.HORIZONTAL
-                              gravity = Gravity.CENTER_VERTICAL
-                              setPadding(0, dp(4), 0, dp(4))
-                          }
-                          row.addView(TextView(this).apply {
-                              text = s.name
-                              textSize = 15f
-                              setTextColor(color(R.color.ink))
-                              layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                          })
-                          row.addView(textButton("Edit") { showEditSpotDialog(c.key, s.name) })
-                          row.addView(textButton("Delete") {
-                              val all = Store.load(this)
-                              val entry = all.firstOrNull { it.key == c.key }
-                              entry?.spots?.removeAll { it.name == s.name }
-                              if (entry != null && entry.spots.isEmpty()) all.remove(entry)
-                              Store.save(this, all)
-                              recomputeMatch()
-                              renderReminder()
-                              renderSaved()
-                          })
-                          card.addView(row)
-                      }
-                      savedList.addView(card)
-                  }
-              }
-
-              /** Shows a small dialog to rename a spot, keeping its done state. */
-              private fun showEditSpotDialog(cityKey: String, oldName: String) {
-                  val input = TextInputEditText(this).apply {
-                      setText(oldName)
-                      setSelection(text?.length ?: 0)
-                  }
-                  val til = com.google.android.material.textfield.TextInputLayout(this).apply {
-                      boxBackgroundMode = com.google.android.material.textfield.TextInputLayout.BOX_BACKGROUND_FILLED
-                      setBoxCornerRadii(dp(14).toFloat(), dp(14).toFloat(), dp(14).toFloat(), dp(14).toFloat())
-                      setBoxBackgroundColorResource(R.color.field)
-                      hint = "Spot name"
-                      addView(input)
-                  }
-                  val wrap = FrameLayout(this).apply {
-                      val pad = dp(20)
-                      setPadding(pad, dp(8), pad, 0)
-                      addView(til)
-                  }
-                  AlertDialog.Builder(this)
-                      .setTitle("Edit spot name")
-                      .setView(wrap)
-                      .setPositiveButton("Save") { _, _ ->
-                          val newName = input.text?.toString()?.trim().orEmpty()
-                          if (newName.isEmpty()) return@setPositiveButton
-                          val all = Store.load(this)
-                          val entry = all.firstOrNull { it.key == cityKey } ?: return@setPositiveButton
-                          val spot = entry.spots.firstOrNull { it.name == oldName } ?: return@setPositiveButton
-                          val clash = entry.spots.any { it !== spot && Store.norm(it.name) == Store.norm(newName) }
-                          if (clash) {
-                              entry.spots.remove(spot)
-                          } else {
-                              spot.name = Store.titleCase(newName)
-                          }
-                          Store.save(this, all)
-                          recomputeMatch()
-                          renderReminder()
-                          renderSaved()
-                      }
-                      .setNegativeButton("Cancel", null)
-                      .show()
-              }
           }
-          SPOT_EOF_10
+          SPOT_EOF_11
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/MapPickerActivity.kt <<'SPOT_EOF_11'
+          cat > app/src/main/java/com/spotreminder/app/MapPickerActivity.kt <<'SPOT_EOF_12'
           package com.spotreminder.app
 
           import android.annotation.SuppressLint
@@ -1210,9 +1166,9 @@ jobs:
                   }
               }
           }
-          SPOT_EOF_11
+          SPOT_EOF_12
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/Notifier.kt <<'SPOT_EOF_12'
+          cat > app/src/main/java/com/spotreminder/app/Notifier.kt <<'SPOT_EOF_13'
           package com.spotreminder.app
 
           import android.Manifest
@@ -1279,9 +1235,9 @@ jobs:
                   }
               }
           }
-          SPOT_EOF_12
+          SPOT_EOF_13
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/Osm.kt <<'SPOT_EOF_13'
+          cat > app/src/main/java/com/spotreminder/app/Osm.kt <<'SPOT_EOF_14'
           package com.spotreminder.app
 
           import android.content.Context
@@ -1420,30 +1376,24 @@ jobs:
                   }
               }
           }
-          SPOT_EOF_13
+          SPOT_EOF_14
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/SettingsActivity.kt <<'SPOT_EOF_14'
+          cat > app/src/main/java/com/spotreminder/app/ProfileActivity.kt <<'SPOT_EOF_15'
           package com.spotreminder.app
 
-          import android.Manifest
           import android.content.Intent
-          import android.content.pm.PackageManager
           import android.graphics.Bitmap
           import android.graphics.BitmapFactory
           import android.net.Uri
-          import android.os.Build
           import android.os.Bundle
-          import android.provider.Settings
           import android.view.View
           import android.view.ViewOutlineProvider
           import android.widget.ImageView
-          import android.widget.RadioGroup
           import android.widget.TextView
           import android.widget.Toast
           import androidx.activity.result.contract.ActivityResultContracts
           import androidx.appcompat.app.AlertDialog
           import androidx.appcompat.app.AppCompatActivity
-          import androidx.core.content.ContextCompat
           import com.google.android.gms.auth.api.signin.GoogleSignIn
           import com.google.android.gms.auth.api.signin.GoogleSignInAccount
           import com.google.android.gms.auth.api.signin.GoogleSignInClient
@@ -1455,7 +1405,7 @@ jobs:
           import java.net.URL
           import java.util.concurrent.Executors
 
-          class SettingsActivity : AppCompatActivity() {
+          class ProfileActivity : AppCompatActivity() {
 
               private val io = Executors.newSingleThreadExecutor()
 
@@ -1465,8 +1415,9 @@ jobs:
               private lateinit var btnSignIn: MaterialButton
               private lateinit var btnSignOut: MaterialButton
               private lateinit var backupActions: android.widget.LinearLayout
-              private lateinit var themeGroup: RadioGroup
-              private lateinit var permStatus: TextView
+              private lateinit var nameInput: TextInputEditText
+              private lateinit var phoneInput: TextInputEditText
+              private lateinit var addressInput: TextInputEditText
 
               private lateinit var googleClient: GoogleSignInClient
               private var account: GoogleSignInAccount? = null
@@ -1476,26 +1427,15 @@ jobs:
                       val task = GoogleSignIn.getSignedInAccountFromIntent(r.data)
                       try {
                           account = task.getResult(ApiException::class.java)
-                          updateAccountUi()
+                          updateHeader()
                       } catch (e: ApiException) {
                           Toast.makeText(this, "Sign-in didn't complete (code ${e.statusCode}).", Toast.LENGTH_LONG).show()
                       }
                   }
 
-              private val permLauncher =
-                  registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-                      updatePermStatus()
-                      if (hasLocation() && !hasBackground()) askBackground()
-                  }
-
-              private val bgLauncher =
-                  registerForActivityResult(ActivityResultContracts.RequestPermission()) { updatePermStatus() }
-
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
-                  setContentView(R.layout.activity_settings)
-
-                  findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
+                  setContentView(R.layout.activity_profile)
 
                   avatar = findViewById(R.id.avatar)
                   profileName = findViewById(R.id.profileName)
@@ -1503,33 +1443,31 @@ jobs:
                   btnSignIn = findViewById(R.id.btnSignIn)
                   btnSignOut = findViewById(R.id.btnSignOut)
                   backupActions = findViewById(R.id.backupActions)
-                  themeGroup = findViewById(R.id.themeGroup)
-                  permStatus = findViewById(R.id.permStatus)
+                  nameInput = findViewById(R.id.profileNameInput)
+                  phoneInput = findViewById(R.id.profilePhoneInput)
+                  addressInput = findViewById(R.id.profileAddressInput)
 
                   avatar.clipToOutline = true
                   avatar.outlineProvider = ViewOutlineProvider.BACKGROUND
+
+                  BottomNav.setup(this, BottomNav.Tab.PROFILE)
 
                   val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                       .requestScopes(Scope("https://www.googleapis.com/auth/drive.appdata"))
                       .build()
                   googleClient = GoogleSignIn.getClient(this, gso)
                   account = GoogleSignIn.getLastSignedInAccount(this)
-                  updateAccountUi()
 
                   btnSignIn.setOnClickListener { signInLauncher.launch(googleClient.signInIntent) }
                   btnSignOut.setOnClickListener {
                       googleClient.signOut().addOnCompleteListener {
                           account = null
-                          updateAccountUi()
+                          updateHeader()
                       }
                   }
                   findViewById<View>(R.id.btnBackupNow).setOnClickListener { doBackup() }
                   findViewById<View>(R.id.btnRestore).setOnClickListener { doRestore() }
 
-                  // Local profile (name/phone/address), separate from the Google account
-                  val nameInput = findViewById<TextInputEditText>(R.id.profileNameInput)
-                  val phoneInput = findViewById<TextInputEditText>(R.id.profilePhoneInput)
-                  val addressInput = findViewById<TextInputEditText>(R.id.profileAddressInput)
                   nameInput.setText(Store.profileName(this))
                   phoneInput.setText(Store.profilePhone(this))
                   addressInput.setText(Store.profileAddress(this))
@@ -1540,60 +1478,38 @@ jobs:
                           phoneInput.text?.toString()?.trim().orEmpty(),
                           addressInput.text?.toString()?.trim().orEmpty()
                       )
+                      updateHeader()
                       Toast.makeText(this, "Profile saved.", Toast.LENGTH_SHORT).show()
                   }
-
-                  // Theme
-                  when (Store.themeMode(this)) {
-                      "light" -> themeGroup.check(R.id.themeLight)
-                      "dark" -> themeGroup.check(R.id.themeDark)
-                      else -> themeGroup.check(R.id.themeSystem)
-                  }
-                  themeGroup.setOnCheckedChangeListener { _, checkedId ->
-                      val mode = when (checkedId) {
-                          R.id.themeLight -> "light"
-                          R.id.themeDark -> "dark"
-                          else -> "system"
-                      }
-                      if (mode != Store.themeMode(this)) {
-                          Store.setThemeMode(this, mode)
-                          App.applyTheme(mode)
-                      }
+                  findViewById<View>(R.id.btnOpenSettings).setOnClickListener {
+                      startActivity(Intent(this, SettingsActivity::class.java))
                   }
 
-                  // Permissions
-                  findViewById<View>(R.id.btnGrant).setOnClickListener { requestPermissions() }
-                  findViewById<View>(R.id.btnAppSettings).setOnClickListener { openAppSettings() }
-                  findViewById<View>(R.id.btnBattery).setOnClickListener {
-                      try {
-                          startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-                      } catch (e: Exception) {
-                          openAppSettings()
-                      }
-                  }
-                  updatePermStatus()
+                  updateHeader()
               }
 
               override fun onResume() {
                   super.onResume()
-                  updatePermStatus()
+                  updateHeader()
               }
 
-              // ---------- Account ----------
-
-              private fun updateAccountUi() {
+              private fun updateHeader() {
                   val a = account
+                  val localName = Store.profileName(this)
+                  profileName.text = when {
+                      !localName.isBlank() -> localName
+                      a?.displayName?.isNotBlank() == true -> a.displayName!!
+                      else -> "Add your name"
+                  }
+                  profileEmail.text = a?.email ?: "Not signed in"
+
                   if (a == null) {
-                      profileName.text = "Not signed in"
-                      profileEmail.text = "Sign in to back up your cities and spots"
                       btnSignIn.visibility = View.VISIBLE
                       btnSignOut.visibility = View.GONE
                       backupActions.visibility = View.GONE
                       avatar.setImageResource(R.drawable.ic_person)
-                      avatar.setPadding(dp(10), dp(10), dp(10), dp(10))
+                      avatar.setPadding(dp(18), dp(18), dp(18), dp(18))
                   } else {
-                      profileName.text = a.displayName ?: "Signed in"
-                      profileEmail.text = a.email ?: ""
                       btnSignIn.visibility = View.GONE
                       btnSignOut.visibility = View.VISIBLE
                       backupActions.visibility = View.VISIBLE
@@ -1603,7 +1519,7 @@ jobs:
 
               private fun loadAvatar(uri: Uri?) {
                   avatar.setImageResource(R.drawable.ic_person)
-                  avatar.setPadding(dp(10), dp(10), dp(10), dp(10))
+                  avatar.setPadding(dp(18), dp(18), dp(18), dp(18))
                   if (uri == null) return
                   io.execute {
                       val bmp: Bitmap? = try {
@@ -1655,7 +1571,7 @@ jobs:
                                       .setMessage("This replaces the cities and spots saved on this phone with your Google Drive backup.")
                                       .setPositiveButton("Restore") { _, _ ->
                                           if (Store.setRawData(this, json)) {
-                                              Toast.makeText(this, "Restored. Go back to see your spots.", Toast.LENGTH_LONG).show()
+                                              Toast.makeText(this, "Restored.", Toast.LENGTH_LONG).show()
                                           } else {
                                               Toast.makeText(this, "That backup looked corrupted.", Toast.LENGTH_LONG).show()
                                           }
@@ -1671,8 +1587,85 @@ jobs:
                       }
                   }
               }
+          }
+          SPOT_EOF_15
+          mkdir -p app/src/main/java/com/spotreminder/app
+          cat > app/src/main/java/com/spotreminder/app/SettingsActivity.kt <<'SPOT_EOF_16'
+          package com.spotreminder.app
 
-              // ---------- Permissions ----------
+          import android.Manifest
+          import android.content.Intent
+          import android.content.pm.PackageManager
+          import android.net.Uri
+          import android.os.Build
+          import android.os.Bundle
+          import android.provider.Settings
+          import android.view.View
+          import android.widget.RadioGroup
+          import android.widget.TextView
+          import androidx.activity.result.contract.ActivityResultContracts
+          import androidx.appcompat.app.AlertDialog
+          import androidx.appcompat.app.AppCompatActivity
+          import androidx.core.content.ContextCompat
+
+          class SettingsActivity : AppCompatActivity() {
+
+              private lateinit var themeGroup: RadioGroup
+              private lateinit var permStatus: TextView
+
+              private val permLauncher =
+                  registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+                      updatePermStatus()
+                      if (hasLocation() && !hasBackground()) askBackground()
+                  }
+
+              private val bgLauncher =
+                  registerForActivityResult(ActivityResultContracts.RequestPermission()) { updatePermStatus() }
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  setContentView(R.layout.activity_settings)
+
+                  findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
+
+                  themeGroup = findViewById(R.id.themeGroup)
+                  permStatus = findViewById(R.id.permStatus)
+
+                  // Theme
+                  when (Store.themeMode(this)) {
+                      "light" -> themeGroup.check(R.id.themeLight)
+                      "dark" -> themeGroup.check(R.id.themeDark)
+                      else -> themeGroup.check(R.id.themeSystem)
+                  }
+                  themeGroup.setOnCheckedChangeListener { _, checkedId ->
+                      val mode = when (checkedId) {
+                          R.id.themeLight -> "light"
+                          R.id.themeDark -> "dark"
+                          else -> "system"
+                      }
+                      if (mode != Store.themeMode(this)) {
+                          Store.setThemeMode(this, mode)
+                          App.applyTheme(mode)
+                      }
+                  }
+
+                  // Permissions
+                  findViewById<View>(R.id.btnGrant).setOnClickListener { requestPermissions() }
+                  findViewById<View>(R.id.btnAppSettings).setOnClickListener { openAppSettings() }
+                  findViewById<View>(R.id.btnBattery).setOnClickListener {
+                      try {
+                          startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                      } catch (e: Exception) {
+                          openAppSettings()
+                      }
+                  }
+                  updatePermStatus()
+              }
+
+              override fun onResume() {
+                  super.onResume()
+                  updatePermStatus()
+              }
 
               private fun granted(p: String) =
                   ContextCompat.checkSelfPermission(this, p) == PackageManager.PERMISSION_GRANTED
@@ -1730,9 +1723,536 @@ jobs:
                   startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
               }
           }
-          SPOT_EOF_14
+          SPOT_EOF_16
           mkdir -p app/src/main/java/com/spotreminder/app
-          cat > app/src/main/java/com/spotreminder/app/Store.kt <<'SPOT_EOF_15'
+          cat > app/src/main/java/com/spotreminder/app/SpotDetailActivity.kt <<'SPOT_EOF_17'
+          package com.spotreminder.app
+
+          import android.content.Intent
+          import android.graphics.Typeface
+          import android.os.Bundle
+          import android.view.Gravity
+          import android.view.View
+          import android.widget.LinearLayout
+          import android.widget.TextView
+          import androidx.appcompat.app.AppCompatActivity
+          import androidx.core.content.ContextCompat
+          import java.text.SimpleDateFormat
+          import java.util.Locale
+
+          class SpotDetailActivity : AppCompatActivity() {
+
+              private lateinit var cityKey: String
+              private lateinit var cityName: String
+              private lateinit var spotName: String
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  setContentView(R.layout.activity_spot_detail)
+
+                  cityKey = intent.getStringExtra("cityKey").orEmpty()
+                  cityName = intent.getStringExtra("cityName").orEmpty()
+                  spotName = intent.getStringExtra("spotName").orEmpty()
+
+                  findViewById<TextView>(R.id.spotTitle).text = spotName
+                  findViewById<TextView>(R.id.spotSubtitle).text = cityName
+                  findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
+              }
+
+              override fun onResume() {
+                  super.onResume()
+                  render()
+              }
+
+              private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+              private fun color(id: Int) = ContextCompat.getColor(this, id)
+
+              private fun render() {
+                  val trips = TripStore.tripsForCity(this, cityKey)
+                      .filter { it.spotName == spotName && it.endTime != null }
+                      .sortedByDescending { it.startTime }
+
+                  findViewById<TextView>(R.id.totalCost).text = "%.0f".format(trips.sumOf { it.totalCost })
+                  findViewById<TextView>(R.id.totalDistance).text = "%.1f km".format(trips.sumOf { it.distanceKm })
+
+                  val list = findViewById<LinearLayout>(R.id.tripList)
+                  list.removeAllViews()
+                  if (trips.isEmpty()) {
+                      list.addView(TextView(this).apply {
+                          text = "No completed trips yet. Start one from the Spots tab."
+                          setTextColor(color(R.color.river_soft))
+                          setPadding(dp(4), dp(12), dp(4), dp(12))
+                      })
+                      return
+                  }
+
+                  val df = SimpleDateFormat("d MMM yyyy, HH:mm", Locale.getDefault())
+                  for (t in trips) {
+                      val card = LinearLayout(this).apply {
+                          orientation = LinearLayout.VERTICAL
+                          background = ContextCompat.getDrawable(this@SpotDetailActivity, R.drawable.bg_paper)
+                          setPadding(dp(14), dp(12), dp(14), dp(12))
+                          layoutParams = LinearLayout.LayoutParams(
+                              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                          ).apply { topMargin = dp(10) }
+                          isClickable = true
+                          setOnClickListener {
+                              startActivity(Intent(this@SpotDetailActivity, TripMapActivity::class.java).putExtra("tripId", t.id))
+                          }
+                      }
+                      card.addView(TextView(this).apply {
+                          text = df.format(java.util.Date(t.startTime))
+                          textSize = 13f
+                          setTypeface(typeface, Typeface.BOLD)
+                          setTextColor(color(R.color.ink))
+                      })
+                      val statsRow = LinearLayout(this).apply {
+                          orientation = LinearLayout.HORIZONTAL
+                          gravity = Gravity.CENTER_VERTICAL
+                          layoutParams = LinearLayout.LayoutParams(
+                              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                          ).apply { topMargin = dp(4) }
+                      }
+                      statsRow.addView(TextView(this).apply {
+                          text = "%.1f km · %d min".format(t.distanceKm, t.durationMinutes)
+                          textSize = 12f
+                          setTextColor(color(R.color.river_soft))
+                          layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                      })
+                      statsRow.addView(TextView(this).apply {
+                          text = "%.0f total".format(t.totalCost)
+                          textSize = 15f
+                          setTypeface(typeface, Typeface.BOLD)
+                          setTextColor(color(R.color.saffron))
+                      })
+                      card.addView(statsRow)
+
+                      if (t.costs.isNotEmpty()) {
+                          val chipRow = LinearLayout(this).apply {
+                              orientation = LinearLayout.HORIZONTAL
+                              layoutParams = LinearLayout.LayoutParams(
+                                  LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                              ).apply { topMargin = dp(6) }
+                          }
+                          for (c in t.costs) {
+                              chipRow.addView(TextView(this).apply {
+                                  text = "${c.category}: ${"%.0f".format(c.amount)}"
+                                  textSize = 11f
+                                  setTextColor(color(R.color.river_soft))
+                                  setPadding(dp(8), dp(4), dp(8), dp(4))
+                                  background = ContextCompat.getDrawable(this@SpotDetailActivity, R.drawable.bg_current)
+                                  layoutParams = LinearLayout.LayoutParams(
+                                      LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                                  ).apply { marginEnd = dp(6) }
+                              })
+                          }
+                          card.addView(chipRow)
+                      }
+
+                      card.addView(TextView(this).apply {
+                          text = "Tap to view route on map →"
+                          textSize = 11f
+                          setTextColor(color(R.color.river_soft))
+                          setPadding(0, dp(8), 0, 0)
+                      })
+
+                      list.addView(card)
+                  }
+              }
+          }
+          SPOT_EOF_17
+          mkdir -p app/src/main/java/com/spotreminder/app
+          cat > app/src/main/java/com/spotreminder/app/SpotsActivity.kt <<'SPOT_EOF_18'
+          package com.spotreminder.app
+
+          import android.content.Intent
+          import android.graphics.Typeface
+          import android.os.Bundle
+          import android.view.Gravity
+          import android.view.View
+          import android.widget.FrameLayout
+          import android.widget.LinearLayout
+          import android.widget.TextView
+          import androidx.appcompat.app.AlertDialog
+          import androidx.appcompat.app.AppCompatActivity
+          import androidx.core.content.ContextCompat
+          import com.google.android.material.button.MaterialButton
+          import com.google.android.material.textfield.TextInputEditText
+          import com.google.android.material.textfield.TextInputLayout
+          import java.text.SimpleDateFormat
+          import java.util.Date
+          import java.util.Locale
+          import java.util.UUID
+
+          class SpotsActivity : AppCompatActivity() {
+
+              private lateinit var spotsList: LinearLayout
+              private lateinit var activeBanner: LinearLayout
+              private lateinit var activeSpot: TextView
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  setContentView(R.layout.activity_spots)
+
+                  spotsList = findViewById(R.id.spotsList)
+                  activeBanner = findViewById(R.id.activeBanner)
+                  activeSpot = findViewById(R.id.activeSpot)
+
+                  BottomNav.setup(this, BottomNav.Tab.SPOTS)
+
+                  findViewById<View>(R.id.btnEndActive).setOnClickListener {
+                      TripStore.activeTrip(this)?.let { showEndTripDialog(it) }
+                  }
+              }
+
+              override fun onResume() {
+                  super.onResume()
+                  render()
+              }
+
+              private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+              private fun color(id: Int) = ContextCompat.getColor(this, id)
+
+              private fun textButton(label: String, c: Int = R.color.brick, onClick: () -> Unit): MaterialButton =
+                  MaterialButton(this, null, android.R.attr.borderlessButtonStyle).apply {
+                      text = label
+                      isAllCaps = false
+                      setTextColor(color(c))
+                      setOnClickListener { onClick() }
+                  }
+
+              private fun render() {
+                  val active = TripStore.activeTrip(this)
+                  if (active == null) {
+                      activeBanner.visibility = View.GONE
+                  } else {
+                      activeBanner.visibility = View.VISIBLE
+                      activeSpot.text = active.spotName + " · " + active.cityName
+                  }
+
+                  spotsList.removeAllViews()
+                  val cities = Store.load(this)
+                  if (cities.isEmpty()) {
+                      spotsList.addView(TextView(this).apply {
+                          text = "Nothing saved yet. Add a city and a spot from the Home tab."
+                          setTextColor(color(R.color.river_soft))
+                          setPadding(dp(4), dp(16), dp(4), dp(16))
+                      })
+                      return
+                  }
+
+                  for (c in cities) {
+                      val card = LinearLayout(this).apply {
+                          orientation = LinearLayout.VERTICAL
+                          background = ContextCompat.getDrawable(this@SpotsActivity, R.drawable.bg_paper)
+                          setPadding(dp(16), dp(10), dp(8), dp(10))
+                          layoutParams = LinearLayout.LayoutParams(
+                              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                          ).apply { topMargin = dp(12) }
+                      }
+
+                      val head = LinearLayout(this).apply {
+                          orientation = LinearLayout.HORIZONTAL
+                          gravity = Gravity.CENTER_VERTICAL
+                      }
+                      head.addView(TextView(this).apply {
+                          text = c.name
+                          textSize = 17f
+                          setTypeface(typeface, Typeface.BOLD)
+                          setTextColor(color(R.color.ink))
+                          layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                      })
+                      head.addView(textButton("Remove city") {
+                          AlertDialog.Builder(this)
+                              .setTitle("Remove " + c.name + "?")
+                              .setMessage("This deletes the city and all its spots. Trip history is kept.")
+                              .setPositiveButton("Remove") { _, _ ->
+                                  val all = Store.load(this)
+                                  all.removeAll { it.key == c.key }
+                                  Store.save(this, all)
+                                  render()
+                              }
+                              .setNegativeButton("Cancel", null)
+                              .show()
+                      })
+                      card.addView(head)
+
+                      for (s in c.spots) {
+                          val trips = TripStore.tripsForCity(this, c.key).filter { it.spotName == s.name && it.endTime != null }
+                          val totalCost = trips.sumOf { it.totalCost }
+                          val isActiveHere = active != null && active.cityKey == c.key && active.spotName == s.name
+
+                          val row = LinearLayout(this).apply {
+                              orientation = LinearLayout.VERTICAL
+                              setPadding(0, dp(6), 0, dp(6))
+                              setOnClickListener {
+                                  startActivity(
+                                      Intent(this@SpotsActivity, SpotDetailActivity::class.java)
+                                          .putExtra("cityKey", c.key)
+                                          .putExtra("cityName", c.name)
+                                          .putExtra("spotName", s.name)
+                                  )
+                              }
+                          }
+                          val nameRow = LinearLayout(this).apply {
+                              orientation = LinearLayout.HORIZONTAL
+                              gravity = Gravity.CENTER_VERTICAL
+                          }
+                          nameRow.addView(TextView(this).apply {
+                              text = s.name
+                              textSize = 15f
+                              setTextColor(color(R.color.ink))
+                              layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                          })
+                          nameRow.addView(textButton("Edit") { showEditSpotDialog(c.key, s.name) })
+                          nameRow.addView(textButton("Delete") {
+                              val all = Store.load(this)
+                              val entry = all.firstOrNull { it.key == c.key }
+                              entry?.spots?.removeAll { it.name == s.name }
+                              if (entry != null && entry.spots.isEmpty()) all.remove(entry)
+                              Store.save(this, all)
+                              render()
+                          })
+                          row.addView(nameRow)
+
+                          val infoRow = LinearLayout(this).apply {
+                              orientation = LinearLayout.HORIZONTAL
+                              gravity = Gravity.CENTER_VERTICAL
+                          }
+                          infoRow.addView(TextView(this).apply {
+                              text = if (trips.isEmpty()) "No trips yet"
+                              else "${trips.size} trip${if (trips.size == 1) "" else "s"} · ${"%.0f".format(totalCost)} spent"
+                              textSize = 12f
+                              setTextColor(color(R.color.river_soft))
+                              layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                          })
+                          if (isActiveHere) {
+                              infoRow.addView(textButton("Recording…", R.color.saffron) {
+                                  TripStore.activeTrip(this)?.let { showEndTripDialog(it) }
+                              })
+                          } else if (active == null) {
+                              infoRow.addView(textButton("Start trip", R.color.saffron) { startTrip(c.key, c.name, s.name) })
+                          }
+                          row.addView(infoRow)
+
+                          card.addView(row)
+                      }
+                      spotsList.addView(card)
+                  }
+              }
+
+              private fun startTrip(cityKey: String, cityName: String, spotName: String) {
+                  if (!LocationChecker.hasLocationPermission(this)) {
+                      AlertDialog.Builder(this)
+                          .setTitle("Location needed")
+                          .setMessage("Turn on location in Settings to record your trip.")
+                          .setPositiveButton("Open Settings") { _, _ ->
+                              startActivity(Intent(this, SettingsActivity::class.java))
+                          }
+                          .setNegativeButton("Cancel", null)
+                          .show()
+                      return
+                  }
+                  val trip = Trip(
+                      id = UUID.randomUUID().toString(),
+                      cityKey = cityKey,
+                      cityName = cityName,
+                      spotName = spotName,
+                      startTime = System.currentTimeMillis()
+                  )
+                  TripStore.setActiveTrip(this, trip)
+                  TripTrackingService.start(this, spotName)
+                  render()
+              }
+
+              private fun showEndTripDialog(trip: Trip) {
+                  val amountInputs = mutableMapOf<String, TextInputEditText>()
+                  val fieldsLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                  for (cat in TRIP_COST_CATEGORIES) {
+                      val input = TextInputEditText(this).apply {
+                          inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+                          hint = "0"
+                      }
+                      val til = TextInputLayout(this).apply {
+                          boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_FILLED
+                          setBoxCornerRadii(dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat())
+                          setBoxBackgroundColorResource(R.color.field)
+                          hint = cat
+                          layoutParams = LinearLayout.LayoutParams(
+                              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                          ).apply { topMargin = dp(8) }
+                          addView(input)
+                      }
+                      amountInputs[cat] = input
+                      fieldsLayout.addView(til)
+                  }
+                  val wrap = FrameLayout(this).apply {
+                      val pad = dp(20)
+                      setPadding(pad, dp(8), pad, 0)
+                      addView(fieldsLayout)
+                  }
+
+                  AlertDialog.Builder(this)
+                      .setTitle("End trip — add costs")
+                      .setView(wrap)
+                      .setPositiveButton("Save trip") { _, _ ->
+                          val costs = mutableListOf<CostItem>()
+                          for ((cat, input) in amountInputs) {
+                              val v = input.text?.toString()?.trim()?.toDoubleOrNull()
+                              if (v != null && v > 0) costs.add(CostItem(cat, v))
+                          }
+                          trip.endTime = System.currentTimeMillis()
+                          trip.costs = costs
+                          TripTrackingService.stop(this)
+                          TripStore.addTrip(this, trip)
+                          TripStore.setActiveTrip(this, null)
+                          render()
+                          android.widget.Toast.makeText(this, "Trip saved.", android.widget.Toast.LENGTH_SHORT).show()
+                      }
+                      .setNegativeButton("Keep recording", null)
+                      .show()
+              }
+
+              private fun showEditSpotDialog(cityKey: String, oldName: String) {
+                  val input = TextInputEditText(this).apply {
+                      setText(oldName)
+                      setSelection(text?.length ?: 0)
+                  }
+                  val til = TextInputLayout(this).apply {
+                      boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_FILLED
+                      setBoxCornerRadii(dp(14).toFloat(), dp(14).toFloat(), dp(14).toFloat(), dp(14).toFloat())
+                      setBoxBackgroundColorResource(R.color.field)
+                      hint = "Spot name"
+                      addView(input)
+                  }
+                  val wrap = FrameLayout(this).apply {
+                      val pad = dp(20)
+                      setPadding(pad, dp(8), pad, 0)
+                      addView(til)
+                  }
+                  AlertDialog.Builder(this)
+                      .setTitle("Edit spot name")
+                      .setView(wrap)
+                      .setPositiveButton("Save") { _, _ ->
+                          val newName = input.text?.toString()?.trim().orEmpty()
+                          if (newName.isEmpty()) return@setPositiveButton
+                          val all = Store.load(this)
+                          val entry = all.firstOrNull { it.key == cityKey } ?: return@setPositiveButton
+                          val spot = entry.spots.firstOrNull { it.name == oldName } ?: return@setPositiveButton
+                          val clash = entry.spots.any { it !== spot && Store.norm(it.name) == Store.norm(newName) }
+                          if (clash) entry.spots.remove(spot) else spot.name = Store.titleCase(newName)
+                          Store.save(this, all)
+                          render()
+                      }
+                      .setNegativeButton("Cancel", null)
+                      .show()
+              }
+          }
+          SPOT_EOF_18
+          mkdir -p app/src/main/java/com/spotreminder/app
+          cat > app/src/main/java/com/spotreminder/app/StatsActivity.kt <<'SPOT_EOF_19'
+          package com.spotreminder.app
+
+          import android.graphics.Color
+          import android.os.Bundle
+          import android.widget.LinearLayout
+          import android.widget.TextView
+          import androidx.appcompat.app.AppCompatActivity
+          import androidx.core.content.ContextCompat
+
+          class StatsActivity : AppCompatActivity() {
+
+              private val categoryColors = mapOf(
+                  "Fuel" to "#F2A516",
+                  "Food" to "#4CAF7D",
+                  "Tickets" to "#4D8FD1",
+                  "Other" to "#8A8FA3"
+              )
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  setContentView(R.layout.activity_stats)
+                  BottomNav.setup(this, BottomNav.Tab.STATS)
+              }
+
+              override fun onResume() {
+                  super.onResume()
+                  render()
+              }
+
+              private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+              private fun color(id: Int) = ContextCompat.getColor(this, id)
+
+              private fun render() {
+                  val trips = TripStore.loadTrips(this).filter { it.endTime != null }
+                  val totalCost = trips.sumOf { it.totalCost }
+                  val totalDistance = trips.sumOf { it.distanceKm }
+
+                  findViewById<TextView>(R.id.statTotalCost).text = "%.0f".format(totalCost)
+                  findViewById<TextView>(R.id.statTotalDistance).text = "%.1f km".format(totalDistance)
+                  findViewById<TextView>(R.id.statTripCount).text =
+                      "${trips.size} completed trip${if (trips.size == 1) "" else "s"}"
+
+                  val byCategory = linkedMapOf<String, Double>()
+                  for (cat in TRIP_COST_CATEGORIES) byCategory[cat] = 0.0
+                  for (t in trips) for (c in t.costs) byCategory[c.category] = (byCategory[c.category] ?: 0.0) + c.amount
+
+                  val list = findViewById<LinearLayout>(R.id.breakdownList)
+                  list.removeAllViews()
+                  val maxVal = byCategory.values.maxOrNull()?.takeIf { it > 0 } ?: 1.0
+
+                  if (totalCost <= 0) {
+                      list.addView(TextView(this).apply {
+                          text = "No costs recorded yet. They'll show up here after you end a trip."
+                          setTextColor(color(R.color.river_soft))
+                          setPadding(dp(4), dp(12), dp(4), dp(12))
+                      })
+                      return
+                  }
+
+                  for ((cat, amount) in byCategory) {
+                      val row = LinearLayout(this).apply {
+                          orientation = LinearLayout.VERTICAL
+                          layoutParams = LinearLayout.LayoutParams(
+                              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                          ).apply { topMargin = dp(10) }
+                      }
+                      val labelRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                      labelRow.addView(TextView(this).apply {
+                          text = cat
+                          textSize = 13f
+                          setTextColor(color(R.color.ink))
+                          layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                      })
+                      labelRow.addView(TextView(this).apply {
+                          text = "%.0f".format(amount)
+                          textSize = 13f
+                          setTextColor(color(R.color.river_soft))
+                      })
+                      row.addView(labelRow)
+
+                      val track = LinearLayout(this).apply {
+                          background = ContextCompat.getDrawable(this@StatsActivity, R.drawable.bg_current)
+                          layoutParams = LinearLayout.LayoutParams(
+                              LinearLayout.LayoutParams.MATCH_PARENT, dp(10)
+                          ).apply { topMargin = dp(4) }
+                      }
+                      val fillWidthFraction = (amount / maxVal).coerceIn(0.02, 1.0)
+                      track.addView(android.view.View(this).apply {
+                          setBackgroundColor(Color.parseColor(categoryColors[cat] ?: "#F2A516"))
+                          layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, fillWidthFraction.toFloat())
+                      })
+                      track.addView(android.view.View(this).apply {
+                          layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, (1 - fillWidthFraction).toFloat())
+                      })
+                      row.addView(track)
+                      list.addView(row)
+                  }
+              }
+          }
+          SPOT_EOF_19
+          mkdir -p app/src/main/java/com/spotreminder/app
+          cat > app/src/main/java/com/spotreminder/app/Store.kt <<'SPOT_EOF_20'
           package com.spotreminder.app
 
           import android.content.Context
@@ -1850,50 +2370,506 @@ jobs:
                       .apply()
               }
           }
-          SPOT_EOF_15
+          SPOT_EOF_20
+          mkdir -p app/src/main/java/com/spotreminder/app
+          cat > app/src/main/java/com/spotreminder/app/Trip.kt <<'SPOT_EOF_21'
+          package com.spotreminder.app
+
+          import org.json.JSONArray
+          import org.json.JSONObject
+
+          /** One recorded GPS point along a trip's path. */
+          data class TrackPoint(val lat: Double, val lon: Double, val time: Long)
+
+          /** One line item in a trip's cost breakdown. */
+          data class CostItem(val category: String, val amount: Double)
+
+          /** A single visit to a spot: when it started/ended, the path taken, and what it cost. */
+          data class Trip(
+              val id: String,
+              val cityKey: String,
+              val cityName: String,
+              val spotName: String,
+              val startTime: Long,
+              var endTime: Long? = null,
+              val path: MutableList<TrackPoint> = mutableListOf(),
+              var costs: MutableList<CostItem> = mutableListOf(),
+              var note: String = ""
+          ) {
+              val totalCost: Double get() = costs.sumOf { it.amount }
+
+              /** Straight-line-segment distance along the recorded path, in kilometers. */
+              val distanceKm: Double
+                  get() {
+                      if (path.size < 2) return 0.0
+                      var total = 0.0
+                      for (i in 1 until path.size) total += haversineKm(path[i - 1], path[i])
+                      return total
+                  }
+
+              val durationMinutes: Long
+                  get() {
+                      val end = endTime ?: return 0
+                      return (end - startTime) / 60000L
+                  }
+
+              companion object {
+                  /** Distance between two points on Earth, in kilometers (haversine formula). */
+                  fun haversineKm(a: TrackPoint, b: TrackPoint): Double {
+                      val r = 6371.0
+                      val dLat = Math.toRadians(b.lat - a.lat)
+                      val dLon = Math.toRadians(b.lon - a.lon)
+                      val la1 = Math.toRadians(a.lat)
+                      val la2 = Math.toRadians(b.lat)
+                      val h = Math.sin(dLat / 2).let { it * it } +
+                          Math.cos(la1) * Math.cos(la2) * Math.sin(dLon / 2).let { it * it }
+                      return 2 * r * Math.asin(Math.sqrt(h))
+                  }
+
+                  fun toJson(t: Trip): JSONObject {
+                      val o = JSONObject()
+                      o.put("id", t.id)
+                      o.put("cityKey", t.cityKey)
+                      o.put("cityName", t.cityName)
+                      o.put("spotName", t.spotName)
+                      o.put("startTime", t.startTime)
+                      o.put("endTime", t.endTime ?: JSONObject.NULL)
+                      o.put("note", t.note)
+                      val path = JSONArray()
+                      for (p in t.path) {
+                          val po = JSONObject()
+                          po.put("lat", p.lat); po.put("lon", p.lon); po.put("time", p.time)
+                          path.put(po)
+                      }
+                      o.put("path", path)
+                      val costs = JSONArray()
+                      for (c in t.costs) {
+                          val co = JSONObject()
+                          co.put("category", c.category); co.put("amount", c.amount)
+                          costs.put(co)
+                      }
+                      o.put("costs", costs)
+                      return o
+                  }
+
+                  fun fromJson(o: JSONObject): Trip {
+                      val path = mutableListOf<TrackPoint>()
+                      val pa = o.optJSONArray("path")
+                      if (pa != null) {
+                          for (i in 0 until pa.length()) {
+                              val po = pa.getJSONObject(i)
+                              path.add(TrackPoint(po.getDouble("lat"), po.getDouble("lon"), po.getLong("time")))
+                          }
+                      }
+                      val costs = mutableListOf<CostItem>()
+                      val ca = o.optJSONArray("costs")
+                      if (ca != null) {
+                          for (i in 0 until ca.length()) {
+                              val co = ca.getJSONObject(i)
+                              costs.add(CostItem(co.getString("category"), co.getDouble("amount")))
+                          }
+                      }
+                      return Trip(
+                          id = o.getString("id"),
+                          cityKey = o.getString("cityKey"),
+                          cityName = o.getString("cityName"),
+                          spotName = o.getString("spotName"),
+                          startTime = o.getLong("startTime"),
+                          endTime = if (o.isNull("endTime")) null else o.getLong("endTime"),
+                          path = path,
+                          costs = costs,
+                          note = o.optString("note", "")
+                      )
+                  }
+              }
+          }
+          SPOT_EOF_21
+          mkdir -p app/src/main/java/com/spotreminder/app
+          cat > app/src/main/java/com/spotreminder/app/TripMapActivity.kt <<'SPOT_EOF_22'
+          package com.spotreminder.app
+
+          import android.content.Intent
+          import android.graphics.Bitmap
+          import android.graphics.Canvas
+          import android.graphics.Color
+          import android.os.Bundle
+          import android.view.View
+          import android.widget.TextView
+          import android.widget.Toast
+          import androidx.appcompat.app.AppCompatActivity
+          import androidx.core.content.FileProvider
+          import org.osmdroid.config.Configuration
+          import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+          import org.osmdroid.util.BoundingBox
+          import org.osmdroid.util.GeoPoint
+          import org.osmdroid.views.MapView
+          import org.osmdroid.views.overlay.Marker
+          import org.osmdroid.views.overlay.Polyline
+          import java.io.File
+          import java.io.FileOutputStream
+
+          class TripMapActivity : AppCompatActivity() {
+
+              private lateinit var map: MapView
+              private var trip: Trip? = null
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+
+                  val cfg = Configuration.getInstance()
+                  cfg.userAgentValue = packageName
+                  cfg.osmdroidBasePath = File(filesDir, "osmdroid")
+                  cfg.osmdroidTileCache = File(cacheDir, "osmdroid-tiles")
+
+                  setContentView(R.layout.activity_trip_map)
+                  map = findViewById(R.id.map)
+                  map.setTileSource(TileSourceFactory.MAPNIK)
+                  map.setMultiTouchControls(true)
+
+                  findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
+                  findViewById<View>(R.id.btnShare).setOnClickListener { shareRoute() }
+
+                  val tripId = intent.getStringExtra("tripId")
+                  val t = TripStore.loadTrips(this).firstOrNull { it.id == tripId }
+                  trip = t
+                  if (t == null || t.path.size < 2) {
+                      findViewById<TextView>(R.id.mapTitle).text = "Route unavailable"
+                      findViewById<TextView>(R.id.routeStats).text =
+                          "No recorded path for this trip (location may have been off during travel)."
+                      findViewById<View>(R.id.btnShare).isEnabled = false
+                      return
+                  }
+
+                  findViewById<TextView>(R.id.mapTitle).text = t.spotName + " · " + t.cityName
+                  findViewById<TextView>(R.id.routeStats).text =
+                      "%.1f km · %d min · %.0f total".format(t.distanceKm, t.durationMinutes, t.totalCost)
+
+                  val points = t.path.map { GeoPoint(it.lat, it.lon) }
+                  val line = Polyline(map).apply {
+                      setPoints(points)
+                      outlinePaint.color = Color.parseColor("#F2A516")
+                      outlinePaint.strokeWidth = 10f
+                  }
+                  map.overlays.add(line)
+
+                  val startMarker = Marker(map).apply {
+                      position = points.first()
+                      title = "Start"
+                      setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                  }
+                  val endMarker = Marker(map).apply {
+                      position = points.last()
+                      title = "End: " + t.spotName
+                      setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                  }
+                  map.overlays.add(startMarker)
+                  map.overlays.add(endMarker)
+
+                  map.post {
+                      val lats = points.map { it.latitude }
+                      val lons = points.map { it.longitude }
+                      val box = BoundingBox(lats.max(), lons.max(), lats.min(), lons.min())
+                      map.zoomToBoundingBox(box, false, 80)
+                  }
+              }
+
+              override fun onResume() {
+                  super.onResume()
+                  map.onResume()
+              }
+
+              override fun onPause() {
+                  map.onPause()
+                  super.onPause()
+              }
+
+              override fun onDestroy() {
+                  map.onDetach()
+                  super.onDestroy()
+              }
+
+              private fun shareRoute() {
+                  val t = trip ?: return
+                  try {
+                      val bmp = Bitmap.createBitmap(map.width, map.height, Bitmap.Config.ARGB_8888)
+                      val canvas = Canvas(bmp)
+                      map.draw(canvas)
+
+                      val dir = File(cacheDir, "trip_maps").apply { mkdirs() }
+                      val file = File(dir, "trip_${t.id}.png")
+                      FileOutputStream(file).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+
+                      val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+                      val send = Intent(Intent.ACTION_SEND).apply {
+                          type = "image/png"
+                          putExtra(Intent.EXTRA_STREAM, uri)
+                          putExtra(
+                              Intent.EXTRA_TEXT,
+                              "My trip to ${t.spotName}, ${t.cityName} — ${"%.1f".format(t.distanceKm)} km"
+                          )
+                          addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                      }
+                      startActivity(Intent.createChooser(send, "Share route"))
+                  } catch (e: Exception) {
+                      Toast.makeText(this, "Couldn't create the share image.", Toast.LENGTH_LONG).show()
+                  }
+              }
+          }
+          SPOT_EOF_22
+          mkdir -p app/src/main/java/com/spotreminder/app
+          cat > app/src/main/java/com/spotreminder/app/TripStore.kt <<'SPOT_EOF_23'
+          package com.spotreminder.app
+
+          import android.content.Context
+          import org.json.JSONArray
+
+          /** Standard cost categories offered when ending a trip. */
+          val TRIP_COST_CATEGORIES = listOf("Fuel", "Food", "Tickets", "Other")
+
+          object TripStore {
+              private const val PREFS = "trip_store"
+              private const val KEY_TRIPS = "trips"
+              private const val KEY_ACTIVE = "active_trip"
+
+              private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+              @Synchronized
+              fun loadTrips(ctx: Context): MutableList<Trip> {
+                  val out = mutableListOf<Trip>()
+                  val raw = prefs(ctx).getString(KEY_TRIPS, null) ?: return out
+                  try {
+                      val arr = JSONArray(raw)
+                      for (i in 0 until arr.length()) out.add(Trip.fromJson(arr.getJSONObject(i)))
+                  } catch (e: Exception) {
+                      // ignore corrupted data
+                  }
+                  return out
+              }
+
+              @Synchronized
+              fun saveTrips(ctx: Context, trips: List<Trip>) {
+                  val arr = JSONArray()
+                  for (t in trips) arr.put(Trip.toJson(t))
+                  prefs(ctx).edit().putString(KEY_TRIPS, arr.toString()).apply()
+              }
+
+              fun addTrip(ctx: Context, trip: Trip) {
+                  val all = loadTrips(ctx)
+                  all.add(0, trip)
+                  saveTrips(ctx, all)
+              }
+
+              fun tripsForCity(ctx: Context, cityKey: String): List<Trip> =
+                  loadTrips(ctx).filter { it.cityKey == cityKey }
+
+              /** The trip currently being recorded (started but not yet ended), or null. */
+              fun activeTrip(ctx: Context): Trip? {
+                  val raw = prefs(ctx).getString(KEY_ACTIVE, null) ?: return null
+                  return try {
+                      Trip.fromJson(org.json.JSONObject(raw))
+                  } catch (e: Exception) {
+                      null
+                  }
+              }
+
+              fun setActiveTrip(ctx: Context, trip: Trip?) {
+                  if (trip == null) {
+                      prefs(ctx).edit().remove(KEY_ACTIVE).apply()
+                  } else {
+                      prefs(ctx).edit().putString(KEY_ACTIVE, Trip.toJson(trip).toString()).apply()
+                  }
+              }
+
+              /** Appends one GPS point to the active trip, if one is running. */
+              @Synchronized
+              fun appendActivePoint(ctx: Context, point: TrackPoint) {
+                  val t = activeTrip(ctx) ?: return
+                  t.path.add(point)
+                  setActiveTrip(ctx, t)
+              }
+          }
+          SPOT_EOF_23
+          mkdir -p app/src/main/java/com/spotreminder/app
+          cat > app/src/main/java/com/spotreminder/app/TripTrackingService.kt <<'SPOT_EOF_24'
+          package com.spotreminder.app
+
+          import android.annotation.SuppressLint
+          import android.app.Notification
+          import android.app.NotificationChannel
+          import android.app.NotificationManager
+          import android.app.PendingIntent
+          import android.app.Service
+          import android.content.Context
+          import android.content.Intent
+          import android.location.Location
+          import android.location.LocationListener
+          import android.location.LocationManager
+          import android.os.Build
+          import android.os.Bundle
+          import android.os.IBinder
+          import androidx.core.app.NotificationCompat
+          import androidx.core.content.ContextCompat
+
+          /** Records GPS points every ~10 seconds / 15 meters while a trip is running. */
+          class TripTrackingService : Service() {
+
+              companion object {
+                  private const val CHANNEL = "trip_tracking"
+                  private const val NOTIF_ID = 2001
+                  const val ACTION_STOP = "com.spotreminder.app.STOP_TRIP"
+                  const val EXTRA_SPOT_NAME = "spot_name"
+
+                  fun start(ctx: Context, spotName: String) {
+                      val i = Intent(ctx, TripTrackingService::class.java).putExtra(EXTRA_SPOT_NAME, spotName)
+                      ContextCompat.startForegroundService(ctx, i)
+                  }
+
+                  fun stop(ctx: Context) {
+                      ctx.stopService(Intent(ctx, TripTrackingService::class.java))
+                  }
+              }
+
+              private var locationManager: LocationManager? = null
+              private var listener: LocationListener? = null
+
+              override fun onBind(intent: Intent?): IBinder? = null
+
+              override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+                  if (intent?.action == ACTION_STOP) {
+                      stopSelf()
+                      return START_NOT_STICKY
+                  }
+                  val spotName = intent?.getStringExtra(EXTRA_SPOT_NAME) ?: "your spot"
+                  startInForeground(spotName)
+                  beginTracking()
+                  return START_STICKY
+              }
+
+              private fun startInForeground(spotName: String) {
+                  if (Build.VERSION.SDK_INT >= 26) {
+                      val ch = NotificationChannel(CHANNEL, "Trip recording", NotificationManager.IMPORTANCE_LOW)
+                      ch.description = "Shows when your route to a spot is being recorded"
+                      (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(ch)
+                  }
+                  val stopIntent = Intent(this, TripTrackingService::class.java).setAction(ACTION_STOP)
+                  val stopPending = PendingIntent.getService(
+                      this, 0, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                  )
+                  val openIntent = PendingIntent.getActivity(
+                      this, 0,
+                      Intent(this, MainActivity::class.java).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                  )
+                  val notif: Notification = NotificationCompat.Builder(this, CHANNEL)
+                      .setSmallIcon(R.drawable.ic_stat_pin)
+                      .setContentTitle("Recording your trip to $spotName")
+                      .setContentText("Tap Stop when you finish, or end it from the app.")
+                      .setContentIntent(openIntent)
+                      .addAction(0, "Stop", stopPending)
+                      .setOngoing(true)
+                      .setPriority(NotificationCompat.PRIORITY_LOW)
+                      .build()
+                  if (Build.VERSION.SDK_INT >= 34) {
+                      startForeground(NOTIF_ID, notif, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+                  } else {
+                      startForeground(NOTIF_ID, notif)
+                  }
+              }
+
+              @SuppressLint("MissingPermission")
+              private fun beginTracking() {
+                  if (!LocationChecker.hasLocationPermission(this)) return
+                  val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+                  locationManager = lm
+                  val l = object : LocationListener {
+                      override fun onLocationChanged(location: Location) {
+                          TripStore.appendActivePoint(
+                              applicationContext,
+                              TrackPoint(location.latitude, location.longitude, System.currentTimeMillis())
+                          )
+                      }
+                      override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+                      override fun onProviderEnabled(provider: String) {}
+                      override fun onProviderDisabled(provider: String) {}
+                  }
+                  listener = l
+                  try {
+                      if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                          lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 10000L, 15f, l)
+                      }
+                      if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                          lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 10000L, 15f, l)
+                      }
+                  } catch (e: SecurityException) {
+                      // permission revoked mid-flight; recording simply stops
+                  }
+              }
+
+              override fun onDestroy() {
+                  listener?.let { locationManager?.removeUpdates(it) }
+                  super.onDestroy()
+              }
+          }
+          SPOT_EOF_24
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_avatar.xml <<'SPOT_EOF_16'
+          cat > app/src/main/res/drawable/bg_avatar.xml <<'SPOT_EOF_25'
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
               <solid android:color="@color/river" />
           </shape>
-          SPOT_EOF_16
+          SPOT_EOF_25
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_current.xml <<'SPOT_EOF_17'
+          cat > app/src/main/res/drawable/bg_current.xml <<'SPOT_EOF_26'
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
               <solid android:color="@color/paper" />
               <stroke android:width="2.5dp" android:color="@color/saffron" />
               <corners android:radius="18dp" />
           </shape>
-          SPOT_EOF_17
+          SPOT_EOF_26
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_paper.xml <<'SPOT_EOF_18'
+          cat > app/src/main/res/drawable/bg_navbar.xml <<'SPOT_EOF_27'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+              <solid android:color="@color/paper" />
+          </shape>
+          SPOT_EOF_27
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/bg_paper.xml <<'SPOT_EOF_28'
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
               <solid android:color="@color/paper" />
               <stroke android:width="1.5dp" android:color="@color/line" />
               <corners android:radius="18dp" />
           </shape>
-          SPOT_EOF_18
+          SPOT_EOF_28
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_river.xml <<'SPOT_EOF_19'
+          cat > app/src/main/res/drawable/bg_river.xml <<'SPOT_EOF_29'
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
               <solid android:color="@color/river" />
               <corners android:radius="22dp" />
           </shape>
-          SPOT_EOF_19
+          SPOT_EOF_29
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/bg_saffron.xml <<'SPOT_EOF_20'
+          cat > app/src/main/res/drawable/bg_saffron.xml <<'SPOT_EOF_30'
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
               <solid android:color="@color/saffron" />
               <corners android:radius="18dp" />
           </shape>
-          SPOT_EOF_20
+          SPOT_EOF_30
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_back.xml <<'SPOT_EOF_21'
+          cat > app/src/main/res/drawable/ic_add.xml <<'SPOT_EOF_31'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFF" android:pathData="M19,13h-6v6h-2v-6L5,13v-2h6L11,5h2v6h6v2z" />
+          </vector>
+          SPOT_EOF_31
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/ic_back.xml <<'SPOT_EOF_32'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
@@ -1902,9 +2878,9 @@ jobs:
                   android:fillColor="#8A9DA0"
                   android:pathData="M20,11H7.83l5.59,-5.59L12,4l-8,8l8,8l1.41,-1.41L7.83,13H20V11z" />
           </vector>
-          SPOT_EOF_21
+          SPOT_EOF_32
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_launcher_foreground.xml <<'SPOT_EOF_22'
+          cat > app/src/main/res/drawable/ic_launcher_foreground.xml <<'SPOT_EOF_33'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="108dp" android:height="108dp"
@@ -1916,9 +2892,45 @@ jobs:
                   android:fillColor="#0F3B4C"
                   android:pathData="M54,41a7,7 0 1,0 0.01,0z" />
           </vector>
-          SPOT_EOF_22
+          SPOT_EOF_33
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_person.xml <<'SPOT_EOF_23'
+          cat > app/src/main/res/drawable/ic_nav_home.xml <<'SPOT_EOF_34'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFF" android:pathData="M10,20v-6h4v6h5v-8h3L12,3 2,12h3v8z" />
+          </vector>
+          SPOT_EOF_34
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/ic_nav_list.xml <<'SPOT_EOF_35'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFF" android:pathData="M4,7h2v2L4,9zM4,11h2v2L4,13zM4,15h2v2L4,17zM8,7h12v2L8,9zM8,11h12v2L8,13zM8,15h12v2L8,17z" />
+          </vector>
+          SPOT_EOF_35
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/ic_nav_profile.xml <<'SPOT_EOF_36'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFF" android:pathData="M12,12c2.21,0 4,-1.79 4,-4s-1.79,-4 -4,-4 -4,1.79 -4,4 1.79,4 4,4zM12,14c-2.67,0 -8,1.34 -8,4v2h16v-2c0,-2.66 -5.33,-4 -8,-4z" />
+          </vector>
+          SPOT_EOF_36
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/ic_nav_stats.xml <<'SPOT_EOF_37'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFF" android:pathData="M5,9.2h3L8,19L5,19zM10.6,5h3L13.6,19h-3zM16.2,13h3L19.2,19h-3z" />
+          </vector>
+          SPOT_EOF_37
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/ic_person.xml <<'SPOT_EOF_38'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
@@ -1927,9 +2939,9 @@ jobs:
                   android:fillColor="#FFFFFF"
                   android:pathData="M12,12c2.21,0 4,-1.79 4,-4s-1.79,-4 -4,-4 -4,1.79 -4,4 1.79,4 4,4zM12,14c-2.67,0 -8,1.34 -8,4v2h16v-2c0,-2.66 -5.33,-4 -8,-4z" />
           </vector>
-          SPOT_EOF_23
+          SPOT_EOF_38
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_settings.xml <<'SPOT_EOF_24'
+          cat > app/src/main/res/drawable/ic_settings.xml <<'SPOT_EOF_39'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
@@ -1938,9 +2950,18 @@ jobs:
                   android:fillColor="#8A9DA0"
                   android:pathData="M19.14,12.94c0.04,-0.3 0.06,-0.61 0.06,-0.94c0,-0.32 -0.02,-0.64 -0.07,-0.94l2.03,-1.58c0.18,-0.14 0.23,-0.41 0.12,-0.61l-1.92,-3.32c-0.12,-0.22 -0.37,-0.29 -0.59,-0.22l-2.39,0.96c-0.5,-0.38 -1.03,-0.7 -1.62,-0.94L14.4,2.81c-0.04,-0.24 -0.24,-0.41 -0.48,-0.41h-3.84c-0.24,0 -0.43,0.17 -0.47,0.41L9.25,5.35C8.66,5.59 8.12,5.92 7.63,6.29L5.24,5.33c-0.22,-0.08 -0.47,0 -0.59,0.22L2.74,8.87C2.62,9.08 2.66,9.34 2.86,9.48l2.03,1.58C4.84,11.36 4.8,11.69 4.8,12s0.02,0.64 0.07,0.94l-2.03,1.58c-0.18,0.14 -0.23,0.41 -0.12,0.61l1.92,3.32c0.12,0.22 0.37,0.29 0.59,0.22l2.39,-0.96c0.5,0.38 1.03,0.7 1.62,0.94l0.36,2.54c0.05,0.24 0.24,0.41 0.48,0.41h3.84c0.24,0 0.44,-0.17 0.47,-0.41l0.36,-2.54c0.59,-0.24 1.13,-0.56 1.62,-0.94l2.39,0.96c0.22,0.08 0.47,0 0.59,-0.22l1.92,-3.32c0.12,-0.22 0.07,-0.47 -0.12,-0.61L19.14,12.94zM12,15.6c-1.98,0 -3.6,-1.62 -3.6,-3.6s1.62,-3.6 3.6,-3.6s3.6,1.62 3.6,3.6S13.98,15.6 12,15.6z" />
           </vector>
-          SPOT_EOF_24
+          SPOT_EOF_39
           mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_stat_pin.xml <<'SPOT_EOF_25'
+          cat > app/src/main/res/drawable/ic_share.xml <<'SPOT_EOF_40'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFF" android:pathData="M18,16.08c-0.76,0 -1.44,0.3 -1.96,0.77L8.91,12.7c0.05,-0.23 0.09,-0.46 0.09,-0.7s-0.04,-0.47 -0.09,-0.7l7.05,-4.11c0.54,0.5 1.25,0.81 2.04,0.81 1.66,0 3,-1.34 3,-3s-1.34,-3 -3,-3 -3,1.34 -3,3c0,0.24 0.04,0.47 0.09,0.7L7.04,9.81C6.5,9.31 5.79,9 5,9c-1.66,0 -3,1.34 -3,3s1.34,3 3,3c0.79,0 1.5,-0.31 2.04,-0.81l7.12,4.16c-0.05,0.21 -0.08,0.43 -0.08,0.65 0,1.61 1.31,2.92 2.92,2.92 1.61,0 2.92,-1.31 2.92,-2.92s-1.31,-2.92 -2.92,-2.92z" />
+          </vector>
+          SPOT_EOF_40
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/ic_stat_pin.xml <<'SPOT_EOF_41'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
@@ -1949,14 +2970,20 @@ jobs:
                   android:fillColor="#FFFFFFFF"
                   android:pathData="M12,2a7,7 0 0,0 -7,7c0,5.2 7,13 7,13s7,-7.8 7,-13a7,7 0 0,0 -7,-7zM12,11.5a2.5,2.5 0 1,1 0,-5a2.5,2.5 0 0,1 0,5z" />
           </vector>
-          SPOT_EOF_25
+          SPOT_EOF_41
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_main.xml <<'SPOT_EOF_26'
+          cat > app/src/main/res/layout/activity_main.xml <<'SPOT_EOF_42'
           <?xml version="1.0" encoding="utf-8"?>
-          <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               xmlns:tools="http://schemas.android.com/tools"
               android:layout_width="match_parent"
               android:layout_height="match_parent"
+              android:orientation="vertical">
+
+          <ScrollView
+              android:layout_width="match_parent"
+              android:layout_height="0dp"
+              android:layout_weight="1"
               android:fillViewport="true">
 
               <LinearLayout
@@ -2199,27 +3226,22 @@ jobs:
                           android:textSize="12sp" />
                   </LinearLayout>
 
-                  <!-- Saved -->
                   <TextView
                       android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
-                      android:layout_marginTop="18dp"
-                      android:text="Your cities and spots"
-                      android:textColor="@color/ink"
-                      android:textSize="16sp"
-                      android:textStyle="bold" />
-
-                  <LinearLayout
-                      android:id="@+id/savedList"
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
+                      android:layout_marginTop="16dp"
                       android:layout_marginBottom="8dp"
-                      android:orientation="vertical" />
+                      android:text="See all your saved spots and start a trip from the Spots tab below."
+                      android:textColor="@color/river_soft"
+                      android:textSize="12sp" />
               </LinearLayout>
           </ScrollView>
-          SPOT_EOF_26
+
+              <include layout="@layout/bottom_nav" />
+          </LinearLayout>
+          SPOT_EOF_42
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_map.xml <<'SPOT_EOF_27'
+          cat > app/src/main/res/layout/activity_map.xml <<'SPOT_EOF_43'
           <?xml version="1.0" encoding="utf-8"?>
           <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
@@ -2322,9 +3344,232 @@ jobs:
                       android:textSize="15sp" />
               </LinearLayout>
           </FrameLayout>
-          SPOT_EOF_27
+          SPOT_EOF_43
           mkdir -p app/src/main/res/layout
-          cat > app/src/main/res/layout/activity_settings.xml <<'SPOT_EOF_28'
+          cat > app/src/main/res/layout/activity_profile.xml <<'SPOT_EOF_44'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:orientation="vertical">
+
+              <ScrollView
+                  android:layout_width="match_parent"
+                  android:layout_height="0dp"
+                  android:layout_weight="1"
+                  android:fillViewport="true">
+
+                  <LinearLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:orientation="vertical"
+                      android:padding="14dp">
+
+                      <LinearLayout
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:gravity="center_horizontal"
+                          android:orientation="vertical"
+                          android:paddingTop="8dp">
+
+                          <ImageView
+                              android:id="@+id/avatar"
+                              android:layout_width="88dp"
+                              android:layout_height="88dp"
+                              android:background="@drawable/bg_avatar"
+                              android:contentDescription="Profile photo"
+                              android:gravity="center"
+                              android:padding="18dp"
+                              android:src="@drawable/ic_person" />
+
+                          <TextView
+                              android:id="@+id/profileName"
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:layout_marginTop="10dp"
+                              android:text="Add your name"
+                              android:textColor="@color/ink"
+                              android:textSize="20sp"
+                              android:textStyle="bold" />
+
+                          <TextView
+                              android:id="@+id/profileEmail"
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:text="Not signed in"
+                              android:textColor="@color/river_soft"
+                              android:textSize="13sp" />
+                      </LinearLayout>
+
+                      <!-- Account -->
+                      <LinearLayout
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="18dp"
+                          android:background="@drawable/bg_paper"
+                          android:orientation="vertical"
+                          android:padding="14dp">
+
+                          <TextView
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:text="Google account &amp; backup"
+                              android:textColor="@color/ink"
+                              android:textSize="15sp"
+                              android:textStyle="bold" />
+
+                          <com.google.android.material.button.MaterialButton
+                              android:id="@+id/btnSignIn"
+                              android:layout_width="match_parent"
+                              android:layout_height="46dp"
+                              android:layout_marginTop="10dp"
+                              android:text="Sign in with Google"
+                              android:textAllCaps="false"
+                              android:textSize="14sp" />
+
+                          <com.google.android.material.button.MaterialButton
+                              android:id="@+id/btnSignOut"
+                              style="?attr/materialButtonOutlinedStyle"
+                              android:layout_width="match_parent"
+                              android:layout_height="42dp"
+                              android:layout_marginTop="10dp"
+                              android:text="Sign out"
+                              android:textAllCaps="false"
+                              android:textSize="13sp"
+                              android:visibility="gone" />
+
+                          <LinearLayout
+                              android:id="@+id/backupActions"
+                              android:layout_width="match_parent"
+                              android:layout_height="wrap_content"
+                              android:layout_marginTop="10dp"
+                              android:orientation="horizontal"
+                              android:visibility="gone">
+
+                              <com.google.android.material.button.MaterialButton
+                                  android:id="@+id/btnBackupNow"
+                                  style="?attr/materialButtonOutlinedStyle"
+                                  android:layout_width="0dp"
+                                  android:layout_height="42dp"
+                                  android:layout_weight="1"
+                                  android:text="Back up now"
+                                  android:textAllCaps="false"
+                                  android:textSize="13sp" />
+
+                              <com.google.android.material.button.MaterialButton
+                                  android:id="@+id/btnRestore"
+                                  style="?attr/materialButtonOutlinedStyle"
+                                  android:layout_width="0dp"
+                                  android:layout_height="42dp"
+                                  android:layout_marginStart="6dp"
+                                  android:layout_weight="1"
+                                  android:text="Restore"
+                                  android:textAllCaps="false"
+                                  android:textSize="13sp" />
+                          </LinearLayout>
+                      </LinearLayout>
+
+                      <!-- Editable local profile -->
+                      <LinearLayout
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="12dp"
+                          android:background="@drawable/bg_paper"
+                          android:orientation="vertical"
+                          android:padding="14dp">
+
+                          <TextView
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:text="Edit profile"
+                              android:textColor="@color/ink"
+                              android:textSize="15sp"
+                              android:textStyle="bold" />
+
+                          <TextView
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:layout_marginTop="2dp"
+                              android:text="Kept on this phone only."
+                              android:textColor="@color/river_soft"
+                              android:textSize="12sp" />
+
+                          <com.google.android.material.textfield.TextInputLayout
+                              style="@style/Widget.SpotReminder.TextField"
+                              android:layout_width="match_parent"
+                              android:layout_height="wrap_content"
+                              android:layout_marginTop="10dp"
+                              android:hint="Full name">
+
+                              <com.google.android.material.textfield.TextInputEditText
+                                  android:id="@+id/profileNameInput"
+                                  android:layout_width="match_parent"
+                                  android:layout_height="wrap_content"
+                                  android:imeOptions="actionNext"
+                                  android:inputType="textPersonName|textCapWords"
+                                  android:singleLine="true" />
+                          </com.google.android.material.textfield.TextInputLayout>
+
+                          <com.google.android.material.textfield.TextInputLayout
+                              style="@style/Widget.SpotReminder.TextField"
+                              android:layout_width="match_parent"
+                              android:layout_height="wrap_content"
+                              android:layout_marginTop="8dp"
+                              android:hint="Phone number">
+
+                              <com.google.android.material.textfield.TextInputEditText
+                                  android:id="@+id/profilePhoneInput"
+                                  android:layout_width="match_parent"
+                                  android:layout_height="wrap_content"
+                                  android:imeOptions="actionNext"
+                                  android:inputType="phone"
+                                  android:singleLine="true" />
+                          </com.google.android.material.textfield.TextInputLayout>
+
+                          <com.google.android.material.textfield.TextInputLayout
+                              style="@style/Widget.SpotReminder.TextField"
+                              android:layout_width="match_parent"
+                              android:layout_height="wrap_content"
+                              android:layout_marginTop="8dp"
+                              android:hint="Address">
+
+                              <com.google.android.material.textfield.TextInputEditText
+                                  android:id="@+id/profileAddressInput"
+                                  android:layout_width="match_parent"
+                                  android:layout_height="wrap_content"
+                                  android:imeOptions="actionDone"
+                                  android:inputType="textPostalAddress|textCapSentences"
+                                  android:maxLines="3" />
+                          </com.google.android.material.textfield.TextInputLayout>
+
+                          <com.google.android.material.button.MaterialButton
+                              android:id="@+id/btnSaveProfile"
+                              android:layout_width="match_parent"
+                              android:layout_height="46dp"
+                              android:layout_marginTop="10dp"
+                              android:text="Save profile"
+                              android:textAllCaps="false"
+                              android:textSize="14sp" />
+                      </LinearLayout>
+
+                      <com.google.android.material.button.MaterialButton
+                          android:id="@+id/btnOpenSettings"
+                          style="?attr/materialButtonOutlinedStyle"
+                          android:layout_width="match_parent"
+                          android:layout_height="48dp"
+                          android:layout_marginTop="14dp"
+                          android:layout_marginBottom="8dp"
+                          android:text="App settings (theme, reminders, battery)"
+                          android:textAllCaps="false"
+                          android:textSize="13sp" />
+                  </LinearLayout>
+              </ScrollView>
+
+              <include layout="@layout/bottom_nav" />
+          </LinearLayout>
+          SPOT_EOF_44
+          mkdir -p app/src/main/res/layout
+          cat > app/src/main/res/layout/activity_settings.xml <<'SPOT_EOF_45'
           <?xml version="1.0" encoding="utf-8"?>
           <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
@@ -2361,204 +3606,11 @@ jobs:
                           android:textStyle="bold" />
                   </LinearLayout>
 
-                  <!-- Account -->
-                  <LinearLayout
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:layout_marginTop="14dp"
-                      android:background="@drawable/bg_paper"
-                      android:orientation="vertical"
-                      android:padding="14dp">
-
-                      <TextView
-                          android:layout_width="wrap_content"
-                          android:layout_height="wrap_content"
-                          android:text="Account"
-                          android:textColor="@color/ink"
-                          android:textSize="16sp"
-                          android:textStyle="bold" />
-
-                      <LinearLayout
-                          android:layout_width="match_parent"
-                          android:layout_height="wrap_content"
-                          android:layout_marginTop="10dp"
-                          android:gravity="center_vertical"
-                          android:orientation="horizontal">
-
-                          <ImageView
-                              android:id="@+id/avatar"
-                              android:layout_width="52dp"
-                              android:layout_height="52dp"
-                              android:background="@drawable/bg_avatar"
-                              android:contentDescription="Profile photo"
-                              android:padding="10dp"
-                              android:src="@drawable/ic_person" />
-
-                          <LinearLayout
-                              android:layout_width="0dp"
-                              android:layout_height="wrap_content"
-                              android:layout_marginStart="12dp"
-                              android:layout_weight="1"
-                              android:orientation="vertical">
-
-                              <TextView
-                                  android:id="@+id/profileName"
-                                  android:layout_width="match_parent"
-                                  android:layout_height="wrap_content"
-                                  android:text="Not signed in"
-                                  android:textColor="@color/ink"
-                                  android:textSize="16sp"
-                                  android:textStyle="bold" />
-
-                              <TextView
-                                  android:id="@+id/profileEmail"
-                                  android:layout_width="match_parent"
-                                  android:layout_height="wrap_content"
-                                  android:text="Sign in to back up your cities and spots"
-                                  android:textColor="@color/river_soft"
-                                  android:textSize="13sp" />
-                          </LinearLayout>
-                      </LinearLayout>
-
-                      <com.google.android.material.button.MaterialButton
-                          android:id="@+id/btnSignIn"
-                          android:layout_width="match_parent"
-                          android:layout_height="46dp"
-                          android:layout_marginTop="12dp"
-                          android:text="Sign in with Google"
-                          android:textAllCaps="false"
-                          android:textSize="14sp" />
-
-                      <com.google.android.material.button.MaterialButton
-                          android:id="@+id/btnSignOut"
-                          style="?attr/materialButtonOutlinedStyle"
-                          android:layout_width="match_parent"
-                          android:layout_height="42dp"
-                          android:layout_marginTop="10dp"
-                          android:text="Sign out"
-                          android:textAllCaps="false"
-                          android:textSize="13sp"
-                          android:visibility="gone" />
-
-                      <LinearLayout
-                          android:id="@+id/backupActions"
-                          android:layout_width="match_parent"
-                          android:layout_height="wrap_content"
-                          android:layout_marginTop="10dp"
-                          android:orientation="horizontal"
-                          android:visibility="gone">
-
-                          <com.google.android.material.button.MaterialButton
-                              android:id="@+id/btnBackupNow"
-                              style="?attr/materialButtonOutlinedStyle"
-                              android:layout_width="0dp"
-                              android:layout_height="42dp"
-                              android:layout_weight="1"
-                              android:text="Back up now"
-                              android:textAllCaps="false"
-                              android:textSize="13sp" />
-
-                          <com.google.android.material.button.MaterialButton
-                              android:id="@+id/btnRestore"
-                              style="?attr/materialButtonOutlinedStyle"
-                              android:layout_width="0dp"
-                              android:layout_height="42dp"
-                              android:layout_marginStart="6dp"
-                              android:layout_weight="1"
-                              android:text="Restore"
-                              android:textAllCaps="false"
-                              android:textSize="13sp" />
-                      </LinearLayout>
-                  </LinearLayout>
-
-                  <!-- Your profile (local, separate from the Google account) -->
-                  <LinearLayout
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:layout_marginTop="12dp"
-                      android:background="@drawable/bg_paper"
-                      android:orientation="vertical"
-                      android:padding="14dp">
-
-                      <TextView
-                          android:layout_width="wrap_content"
-                          android:layout_height="wrap_content"
-                          android:text="Your profile"
-                          android:textColor="@color/ink"
-                          android:textSize="16sp"
-                          android:textStyle="bold" />
-
-                      <TextView
-                          android:layout_width="wrap_content"
-                          android:layout_height="wrap_content"
-                          android:layout_marginTop="2dp"
-                          android:text="Kept on this phone only."
-                          android:textColor="@color/river_soft"
-                          android:textSize="12sp" />
-
-                      <com.google.android.material.textfield.TextInputLayout
-                          style="@style/Widget.SpotReminder.TextField"
-                          android:layout_width="match_parent"
-                          android:layout_height="wrap_content"
-                          android:layout_marginTop="10dp"
-                          android:hint="Full name">
-
-                          <com.google.android.material.textfield.TextInputEditText
-                              android:id="@+id/profileNameInput"
-                              android:layout_width="match_parent"
-                              android:layout_height="wrap_content"
-                              android:imeOptions="actionNext"
-                              android:inputType="textPersonName|textCapWords"
-                              android:singleLine="true" />
-                      </com.google.android.material.textfield.TextInputLayout>
-
-                      <com.google.android.material.textfield.TextInputLayout
-                          style="@style/Widget.SpotReminder.TextField"
-                          android:layout_width="match_parent"
-                          android:layout_height="wrap_content"
-                          android:layout_marginTop="8dp"
-                          android:hint="Phone number">
-
-                          <com.google.android.material.textfield.TextInputEditText
-                              android:id="@+id/profilePhoneInput"
-                              android:layout_width="match_parent"
-                              android:layout_height="wrap_content"
-                              android:imeOptions="actionNext"
-                              android:inputType="phone"
-                              android:singleLine="true" />
-                      </com.google.android.material.textfield.TextInputLayout>
-
-                      <com.google.android.material.textfield.TextInputLayout
-                          style="@style/Widget.SpotReminder.TextField"
-                          android:layout_width="match_parent"
-                          android:layout_height="wrap_content"
-                          android:layout_marginTop="8dp"
-                          android:hint="Address">
-
-                          <com.google.android.material.textfield.TextInputEditText
-                              android:id="@+id/profileAddressInput"
-                              android:layout_width="match_parent"
-                              android:layout_height="wrap_content"
-                              android:imeOptions="actionDone"
-                              android:inputType="textPostalAddress|textCapSentences"
-                              android:maxLines="3" />
-                      </com.google.android.material.textfield.TextInputLayout>
-
-                      <com.google.android.material.button.MaterialButton
-                          android:id="@+id/btnSaveProfile"
-                          android:layout_width="match_parent"
-                          android:layout_height="46dp"
-                          android:layout_marginTop="10dp"
-                          android:text="Save profile"
-                          android:textAllCaps="false"
-                          android:textSize="14sp" />
-                  </LinearLayout>
-
                   <!-- Appearance -->
                   <LinearLayout
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:layout_marginTop="12dp"
+                      android:layout_marginTop="14dp"
                       android:background="@drawable/bg_paper"
                       android:orientation="vertical"
                       android:padding="14dp">
@@ -2693,17 +3745,560 @@ jobs:
                       android:textSize="12sp" />
               </LinearLayout>
           </ScrollView>
-          SPOT_EOF_28
+          SPOT_EOF_45
+          mkdir -p app/src/main/res/layout
+          cat > app/src/main/res/layout/activity_spot_detail.xml <<'SPOT_EOF_46'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:orientation="vertical">
+
+              <ScrollView
+                  android:layout_width="match_parent"
+                  android:layout_height="match_parent"
+                  android:fillViewport="true">
+
+                  <LinearLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:orientation="vertical"
+                      android:padding="14dp">
+
+                      <LinearLayout
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:gravity="center_vertical"
+                          android:orientation="horizontal">
+
+                          <ImageButton
+                              android:id="@+id/btnBack"
+                              android:layout_width="40dp"
+                              android:layout_height="40dp"
+                              android:background="?attr/selectableItemBackgroundBorderless"
+                              android:contentDescription="Back"
+                              android:src="@drawable/ic_back" />
+
+                          <LinearLayout
+                              android:layout_width="0dp"
+                              android:layout_height="wrap_content"
+                              android:layout_marginStart="4dp"
+                              android:layout_weight="1"
+                              android:orientation="vertical">
+
+                              <TextView
+                                  android:id="@+id/spotTitle"
+                                  android:layout_width="match_parent"
+                                  android:layout_height="wrap_content"
+                                  android:textColor="@color/ink"
+                                  android:textSize="20sp"
+                                  android:textStyle="bold" />
+
+                              <TextView
+                                  android:id="@+id/spotSubtitle"
+                                  android:layout_width="match_parent"
+                                  android:layout_height="wrap_content"
+                                  android:textColor="@color/river_soft"
+                                  android:textSize="13sp" />
+                          </LinearLayout>
+                      </LinearLayout>
+
+                      <LinearLayout
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="14dp"
+                          android:orientation="horizontal">
+
+                          <LinearLayout
+                              android:layout_width="0dp"
+                              android:layout_height="wrap_content"
+                              android:layout_weight="1"
+                              android:background="@drawable/bg_saffron"
+                              android:orientation="vertical"
+                              android:padding="14dp">
+
+                              <TextView
+                                  android:layout_width="wrap_content"
+                                  android:layout_height="wrap_content"
+                                  android:text="TOTAL SPENT"
+                                  android:textColor="@color/river"
+                                  android:textSize="11sp"
+                                  android:textStyle="bold" />
+
+                              <TextView
+                                  android:id="@+id/totalCost"
+                                  android:layout_width="wrap_content"
+                                  android:layout_height="wrap_content"
+                                  android:textColor="@color/river"
+                                  android:textSize="26sp"
+                                  android:textStyle="bold" />
+                          </LinearLayout>
+
+                          <LinearLayout
+                              android:layout_width="0dp"
+                              android:layout_height="wrap_content"
+                              android:layout_marginStart="10dp"
+                              android:layout_weight="1"
+                              android:background="@drawable/bg_river"
+                              android:orientation="vertical"
+                              android:padding="14dp">
+
+                              <TextView
+                                  android:layout_width="wrap_content"
+                                  android:layout_height="wrap_content"
+                                  android:text="TOTAL DISTANCE"
+                                  android:textColor="@color/river_light"
+                                  android:textSize="11sp"
+                                  android:textStyle="bold" />
+
+                              <TextView
+                                  android:id="@+id/totalDistance"
+                                  android:layout_width="wrap_content"
+                                  android:layout_height="wrap_content"
+                                  android:textColor="@android:color/white"
+                                  android:textSize="26sp"
+                                  android:textStyle="bold" />
+                          </LinearLayout>
+                      </LinearLayout>
+
+                      <TextView
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="18dp"
+                          android:text="Trip history"
+                          android:textColor="@color/ink"
+                          android:textSize="16sp"
+                          android:textStyle="bold" />
+
+                      <LinearLayout
+                          android:id="@+id/tripList"
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="8dp"
+                          android:layout_marginBottom="8dp"
+                          android:orientation="vertical" />
+                  </LinearLayout>
+              </ScrollView>
+          </LinearLayout>
+          SPOT_EOF_46
+          mkdir -p app/src/main/res/layout
+          cat > app/src/main/res/layout/activity_spots.xml <<'SPOT_EOF_47'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:orientation="vertical">
+
+              <ScrollView
+                  android:layout_width="match_parent"
+                  android:layout_height="0dp"
+                  android:layout_weight="1"
+                  android:fillViewport="true">
+
+                  <LinearLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:orientation="vertical"
+                      android:padding="14dp">
+
+                      <TextView
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="Your spots"
+                          android:textColor="@color/ink"
+                          android:textSize="24sp"
+                          android:textStyle="bold" />
+
+                      <TextView
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="2dp"
+                          android:text="Start a trip when you leave, end it when you arrive."
+                          android:textColor="@color/river_soft"
+                          android:textSize="13sp" />
+
+                      <LinearLayout
+                          android:id="@+id/activeBanner"
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="12dp"
+                          android:background="@drawable/bg_river"
+                          android:orientation="vertical"
+                          android:padding="14dp"
+                          android:visibility="gone">
+
+                          <TextView
+                              android:id="@+id/activeLabel"
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:text="Trip in progress"
+                              android:textColor="@color/river_light"
+                              android:textSize="12sp" />
+
+                          <TextView
+                              android:id="@+id/activeSpot"
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:textColor="@android:color/white"
+                              android:textSize="19sp"
+                              android:textStyle="bold" />
+
+                          <com.google.android.material.button.MaterialButton
+                              android:id="@+id/btnEndActive"
+                              android:layout_width="wrap_content"
+                              android:layout_height="40dp"
+                              android:layout_marginTop="6dp"
+                              android:backgroundTint="@color/saffron"
+                              android:text="End trip"
+                              android:textAllCaps="false"
+                              android:textColor="@color/river" />
+                      </LinearLayout>
+
+                      <LinearLayout
+                          android:id="@+id/spotsList"
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="14dp"
+                          android:layout_marginBottom="8dp"
+                          android:orientation="vertical" />
+                  </LinearLayout>
+              </ScrollView>
+
+              <include layout="@layout/bottom_nav" />
+          </LinearLayout>
+          SPOT_EOF_47
+          mkdir -p app/src/main/res/layout
+          cat > app/src/main/res/layout/activity_stats.xml <<'SPOT_EOF_48'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:orientation="vertical">
+
+              <ScrollView
+                  android:layout_width="match_parent"
+                  android:layout_height="0dp"
+                  android:layout_weight="1"
+                  android:fillViewport="true">
+
+                  <LinearLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:orientation="vertical"
+                      android:padding="14dp">
+
+                      <TextView
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="Travel stats"
+                          android:textColor="@color/ink"
+                          android:textSize="24sp"
+                          android:textStyle="bold" />
+
+                      <TextView
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="2dp"
+                          android:text="Across every trip you've recorded."
+                          android:textColor="@color/river_soft"
+                          android:textSize="13sp" />
+
+                      <LinearLayout
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="14dp"
+                          android:orientation="horizontal">
+
+                          <LinearLayout
+                              android:layout_width="0dp"
+                              android:layout_height="wrap_content"
+                              android:layout_weight="1"
+                              android:background="@drawable/bg_saffron"
+                              android:orientation="vertical"
+                              android:padding="14dp">
+
+                              <TextView
+                                  android:layout_width="wrap_content"
+                                  android:layout_height="wrap_content"
+                                  android:text="TOTAL SPENT"
+                                  android:textColor="@color/river"
+                                  android:textSize="11sp"
+                                  android:textStyle="bold" />
+
+                              <TextView
+                                  android:id="@+id/statTotalCost"
+                                  android:layout_width="wrap_content"
+                                  android:layout_height="wrap_content"
+                                  android:textColor="@color/river"
+                                  android:textSize="26sp"
+                                  android:textStyle="bold" />
+                          </LinearLayout>
+
+                          <LinearLayout
+                              android:layout_width="0dp"
+                              android:layout_height="wrap_content"
+                              android:layout_marginStart="10dp"
+                              android:layout_weight="1"
+                              android:background="@drawable/bg_river"
+                              android:orientation="vertical"
+                              android:padding="14dp">
+
+                              <TextView
+                                  android:layout_width="wrap_content"
+                                  android:layout_height="wrap_content"
+                                  android:text="TOTAL DISTANCE"
+                                  android:textColor="@color/river_light"
+                                  android:textSize="11sp"
+                                  android:textStyle="bold" />
+
+                              <TextView
+                                  android:id="@+id/statTotalDistance"
+                                  android:layout_width="wrap_content"
+                                  android:layout_height="wrap_content"
+                                  android:textColor="@android:color/white"
+                                  android:textSize="26sp"
+                                  android:textStyle="bold" />
+                          </LinearLayout>
+                      </LinearLayout>
+
+                      <LinearLayout
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="12dp"
+                          android:background="@drawable/bg_paper"
+                          android:orientation="vertical"
+                          android:padding="14dp">
+
+                          <TextView
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:text="Trips"
+                              android:textColor="@color/river_soft"
+                              android:textSize="11sp"
+                              android:textStyle="bold" />
+
+                          <TextView
+                              android:id="@+id/statTripCount"
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:textColor="@color/ink"
+                              android:textSize="20sp"
+                              android:textStyle="bold" />
+                      </LinearLayout>
+
+                      <TextView
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="18dp"
+                          android:text="Cost breakdown"
+                          android:textColor="@color/ink"
+                          android:textSize="16sp"
+                          android:textStyle="bold" />
+
+                      <LinearLayout
+                          android:id="@+id/breakdownList"
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="8dp"
+                          android:layout_marginBottom="8dp"
+                          android:orientation="vertical" />
+                  </LinearLayout>
+              </ScrollView>
+
+              <include layout="@layout/bottom_nav" />
+          </LinearLayout>
+          SPOT_EOF_48
+          mkdir -p app/src/main/res/layout
+          cat > app/src/main/res/layout/activity_trip_map.xml <<'SPOT_EOF_49'
+          <?xml version="1.0" encoding="utf-8"?>
+          <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent">
+
+              <org.osmdroid.views.MapView
+                  android:id="@+id/map"
+                  android:layout_width="match_parent"
+                  android:layout_height="match_parent" />
+
+              <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:layout_gravity="top"
+                  android:layout_margin="10dp"
+                  android:background="@drawable/bg_paper"
+                  android:gravity="center_vertical"
+                  android:orientation="horizontal"
+                  android:padding="8dp">
+
+                  <ImageButton
+                      android:id="@+id/btnBack"
+                      android:layout_width="36dp"
+                      android:layout_height="36dp"
+                      android:background="?attr/selectableItemBackgroundBorderless"
+                      android:contentDescription="Back"
+                      android:src="@drawable/ic_back" />
+
+                  <TextView
+                      android:id="@+id/mapTitle"
+                      android:layout_width="0dp"
+                      android:layout_height="wrap_content"
+                      android:layout_marginStart="4dp"
+                      android:layout_weight="1"
+                      android:textColor="@color/ink"
+                      android:textSize="15sp"
+                      android:textStyle="bold" />
+              </LinearLayout>
+
+              <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:layout_gravity="bottom"
+                  android:layout_margin="10dp"
+                  android:background="@drawable/bg_river"
+                  android:orientation="vertical"
+                  android:padding="14dp">
+
+                  <TextView
+                      android:id="@+id/routeStats"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:textColor="@android:color/white"
+                      android:textSize="15sp"
+                      android:textStyle="bold" />
+
+                  <com.google.android.material.button.MaterialButton
+                      android:id="@+id/btnShare"
+                      android:layout_width="match_parent"
+                      android:layout_height="46dp"
+                      android:layout_marginTop="8dp"
+                      android:backgroundTint="@color/saffron"
+                      android:text="Share this route"
+                      android:textAllCaps="false"
+                      android:textColor="@color/river" />
+              </LinearLayout>
+          </FrameLayout>
+          SPOT_EOF_49
+          mkdir -p app/src/main/res/layout
+          cat > app/src/main/res/layout/bottom_nav.xml <<'SPOT_EOF_50'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="64dp"
+              android:background="@drawable/bg_navbar"
+              android:elevation="10dp"
+              android:orientation="horizontal">
+
+              <LinearLayout
+                  android:id="@+id/navHome"
+                  android:layout_width="0dp"
+                  android:layout_height="match_parent"
+                  android:layout_weight="1"
+                  android:background="?attr/selectableItemBackground"
+                  android:gravity="center"
+                  android:orientation="vertical">
+
+                  <ImageView
+                      android:id="@+id/navHomeIcon"
+                      android:layout_width="22dp"
+                      android:layout_height="22dp"
+                      android:contentDescription="Home"
+                      android:src="@drawable/ic_nav_home" />
+
+                  <TextView
+                      android:id="@+id/navHomeLabel"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="2dp"
+                      android:text="Home"
+                      android:textSize="11sp" />
+              </LinearLayout>
+
+              <LinearLayout
+                  android:id="@+id/navSpots"
+                  android:layout_width="0dp"
+                  android:layout_height="match_parent"
+                  android:layout_weight="1"
+                  android:background="?attr/selectableItemBackground"
+                  android:gravity="center"
+                  android:orientation="vertical">
+
+                  <ImageView
+                      android:id="@+id/navSpotsIcon"
+                      android:layout_width="22dp"
+                      android:layout_height="22dp"
+                      android:contentDescription="Spots"
+                      android:src="@drawable/ic_nav_list" />
+
+                  <TextView
+                      android:id="@+id/navSpotsLabel"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="2dp"
+                      android:text="Spots"
+                      android:textSize="11sp" />
+              </LinearLayout>
+
+              <LinearLayout
+                  android:id="@+id/navStats"
+                  android:layout_width="0dp"
+                  android:layout_height="match_parent"
+                  android:layout_weight="1"
+                  android:background="?attr/selectableItemBackground"
+                  android:gravity="center"
+                  android:orientation="vertical">
+
+                  <ImageView
+                      android:id="@+id/navStatsIcon"
+                      android:layout_width="22dp"
+                      android:layout_height="22dp"
+                      android:contentDescription="Stats"
+                      android:src="@drawable/ic_nav_stats" />
+
+                  <TextView
+                      android:id="@+id/navStatsLabel"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="2dp"
+                      android:text="Stats"
+                      android:textSize="11sp" />
+              </LinearLayout>
+
+              <LinearLayout
+                  android:id="@+id/navProfile"
+                  android:layout_width="0dp"
+                  android:layout_height="match_parent"
+                  android:layout_weight="1"
+                  android:background="?attr/selectableItemBackground"
+                  android:gravity="center"
+                  android:orientation="vertical">
+
+                  <ImageView
+                      android:id="@+id/navProfileIcon"
+                      android:layout_width="22dp"
+                      android:layout_height="22dp"
+                      android:contentDescription="Profile"
+                      android:src="@drawable/ic_nav_profile" />
+
+                  <TextView
+                      android:id="@+id/navProfileLabel"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="2dp"
+                      android:text="Profile"
+                      android:textSize="11sp" />
+              </LinearLayout>
+          </LinearLayout>
+          SPOT_EOF_50
           mkdir -p app/src/main/res/mipmap-anydpi-v26
-          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml <<'SPOT_EOF_29'
+          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml <<'SPOT_EOF_51'
           <?xml version="1.0" encoding="utf-8"?>
           <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
               <background android:drawable="@color/river" />
               <foreground android:drawable="@drawable/ic_launcher_foreground" />
           </adaptive-icon>
-          SPOT_EOF_29
+          SPOT_EOF_51
           mkdir -p app/src/main/res/values-night
-          cat > app/src/main/res/values-night/colors.xml <<'SPOT_EOF_30'
+          cat > app/src/main/res/values-night/colors.xml <<'SPOT_EOF_52'
           <resources>
               <!-- A layered dark palette: background darkest, cards a step lighter, fields a step
                    lighter again, so surfaces read as distinct instead of blending together. -->
@@ -2720,9 +4315,9 @@ jobs:
               <color name="brick">#FF8A75</color>
               <color name="line">#243740</color>
           </resources>
-          SPOT_EOF_30
+          SPOT_EOF_52
           mkdir -p app/src/main/res/values-night
-          cat > app/src/main/res/values-night/themes.xml <<'SPOT_EOF_31'
+          cat > app/src/main/res/values-night/themes.xml <<'SPOT_EOF_53'
           <resources>
               <style name="Theme.SpotReminder" parent="Theme.Material3.DayNight.NoActionBar">
                   <item name="colorPrimary">@color/river</item>
@@ -2734,9 +4329,9 @@ jobs:
                   <item name="android:windowLightStatusBar">false</item>
               </style>
           </resources>
-          SPOT_EOF_31
+          SPOT_EOF_53
           mkdir -p app/src/main/res/values
-          cat > app/src/main/res/values/colors.xml <<'SPOT_EOF_32'
+          cat > app/src/main/res/values/colors.xml <<'SPOT_EOF_54'
           <resources>
               <color name="sea">#E4F1EE</color>
               <color name="sea_deep">#CFE4DF</color>
@@ -2751,15 +4346,15 @@ jobs:
               <color name="brick">#B23A2E</color>
               <color name="line">#B9D3CD</color>
           </resources>
-          SPOT_EOF_32
+          SPOT_EOF_54
           mkdir -p app/src/main/res/values
-          cat > app/src/main/res/values/strings.xml <<'SPOT_EOF_33'
+          cat > app/src/main/res/values/strings.xml <<'SPOT_EOF_55'
           <resources>
               <string name="app_name">Spot Reminder</string>
           </resources>
-          SPOT_EOF_33
+          SPOT_EOF_55
           mkdir -p app/src/main/res/values
-          cat > app/src/main/res/values/styles.xml <<'SPOT_EOF_34'
+          cat > app/src/main/res/values/styles.xml <<'SPOT_EOF_56'
           <resources>
               <style name="ShapeAppearanceOverlay.SpotReminder.TextField" parent="">
                   <item name="cornerFamily">rounded</item>
@@ -2776,9 +4371,9 @@ jobs:
                   <item name="colorControlNormal">@color/field_stroke</item>
               </style>
           </resources>
-          SPOT_EOF_34
+          SPOT_EOF_56
           mkdir -p app/src/main/res/values
-          cat > app/src/main/res/values/themes.xml <<'SPOT_EOF_35'
+          cat > app/src/main/res/values/themes.xml <<'SPOT_EOF_57'
           <resources>
               <style name="Theme.SpotReminder" parent="Theme.Material3.DayNight.NoActionBar">
                   <item name="colorPrimary">@color/river</item>
@@ -2790,7 +4385,14 @@ jobs:
                   <item name="android:windowLightStatusBar">true</item>
               </style>
           </resources>
-          SPOT_EOF_35
+          SPOT_EOF_57
+          mkdir -p app/src/main/res/xml
+          cat > app/src/main/res/xml/file_paths.xml <<'SPOT_EOF_58'
+          <?xml version="1.0" encoding="utf-8"?>
+          <paths xmlns:android="http://schemas.android.com/apk/res/android">
+              <cache-path name="trip_maps" path="trip_maps/" />
+          </paths>
+          SPOT_EOF_58
 
       - uses: actions/setup-java@v4
         with:
