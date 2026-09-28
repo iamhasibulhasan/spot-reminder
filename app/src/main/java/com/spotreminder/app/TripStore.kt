@@ -3,8 +3,8 @@ package com.spotreminder.app
 import android.content.Context
 import org.json.JSONArray
 
-/** Standard cost categories offered when ending a trip. */
-val TRIP_COST_CATEGORIES = listOf("Fuel", "Food", "Tickets", "Other")
+/** Quick-pick cost categories shown when adding a cost (any custom text is also allowed). */
+val TRIP_COST_CATEGORIES = listOf("Bus", "Food", "Tickets", "Other")
 
 object TripStore {
     private const val PREFS = "trip_store"
@@ -65,6 +65,14 @@ object TripStore {
     fun appendActivePoint(ctx: Context, point: TrackPoint) {
         val t = activeTrip(ctx) ?: return
         t.path.add(point)
+        setActiveTrip(ctx, t)
+    }
+
+    /** Adds one cost line item to the active trip. Call this as many times as needed during a trip. */
+    @Synchronized
+    fun addCostToActiveTrip(ctx: Context, item: CostItem) {
+        val t = activeTrip(ctx) ?: return
+        t.costs.add(item)
         setActiveTrip(ctx, t)
     }
 }

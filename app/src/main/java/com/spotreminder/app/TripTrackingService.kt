@@ -83,16 +83,44 @@ class TripTrackingService : Service() {
         }
     }
 
+    /** Points less accurate than this (meters) are dropped — they're what causes routes to zig-zag. */
+    private val maxAcceptableAccuracyMeters = 50f
+    private var lastAccepted: Location? = null
+
     @SuppressLint("MissingPermission")
     private fun beginTracking() {
         if (!LocationChecker.hasLocationPermission(this)) return
         val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         locationManager = lm
+
+        // Only one provider at a time: mixing GPS and network-tower fixes in the same path
+        // produces false jumps, since network fixes can be off by hundreds of meters.
+        val provider = when {
+            lm.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
+            lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
+            else -> null
+        } ?: return
+
         val l = object : LocationListener {
             override fun onLocationChanged(location: Location) {
+                if (location.accuracy > maxAcceptableAccuracyMeters) return
+                val prev = lastAccepted
+                // Also drop a fix that implies an impossible speed (a sudden GPS glitch/jump).
+                if (prev != null) {
+                    val elapsedSec = (location.time - prev.time) / 1000.0
+                    if (elapsedSec > 0) {
+                        val jumpKm = Trip.haversineKm(
+                            TrackPoint(prev.latitude, prev.longitude, prev.time),
+                            TrackPoint(location.latitude, location.longitude, location.time)
+                        )
+                        val impliedKmh = jumpKm / (elapsedSec / 3600.0)
+                        if (impliedKmh > 200.0) return
+                    }
+                }
+                lastAccepted = location
                 TripStore.appendActivePoint(
                     applicationContext,
-                    TrackPoint(location.latitude, location.longitude, System.currentTimeMillis())
+                    TrackPoint(location.latitude, location.longitude, location.time)
                 )
             }
             override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
@@ -101,12 +129,7 @@ class TripTrackingService : Service() {
         }
         listener = l
         try {
-            if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 10000L, 15f, l)
-            }
-            if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-                lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 10000L, 15f, l)
-            }
+            lm.requestLocationUpdates(provider, 10000L, 15f, l)
         } catch (e: SecurityException) {
             // permission revoked mid-flight; recording simply stops
         }

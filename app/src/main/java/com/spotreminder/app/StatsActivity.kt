@@ -10,7 +10,7 @@ import androidx.core.content.ContextCompat
 class StatsActivity : AppCompatActivity() {
 
     private val categoryColors = mapOf(
-        "Fuel" to "#F2A516",
+        "Bus" to "#F2A516",
         "Food" to "#4CAF7D",
         "Tickets" to "#4D8FD1",
         "Other" to "#8A8FA3"

@@ -20,8 +20,6 @@ import androidx.core.content.ContextCompat
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import com.google.android.material.button.MaterialButton
-import com.google.android.material.textfield.TextInputEditText
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -35,10 +33,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var remindCard: LinearLayout
     private lateinit var remindTitle: TextView
     private lateinit var remindList: LinearLayout
-    private lateinit var cityLayout: LinearLayout
-    private lateinit var spotLayout: LinearLayout
-    private lateinit var cityInput: android.widget.AutoCompleteTextView
-    private lateinit var spotInput: android.widget.AutoCompleteTextView
+
+    // Only set while the "Add a spot" dialog is on screen — see showAddSpotDialog().
+    private var dialogCityInput: android.widget.AutoCompleteTextView? = null
+    private var dialogSpotInput: android.widget.AutoCompleteTextView? = null
 
     private val io = Executors.newSingleThreadExecutor()
     private var checking = false
@@ -63,15 +61,17 @@ class MainActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
             val name = r.data?.getStringExtra(MapPickerActivity.EXTRA_CITY)
             if (r.resultCode == RESULT_OK && !name.isNullOrBlank()) {
-                suppressCityWatcher = true
-                cityInput.setText(name)
-                cityInput.dismissDropDown()
-                suppressCityWatcher = false
+                dialogCityInput?.let { cityIn ->
+                    suppressCityWatcher = true
+                    cityIn.setText(name)
+                    cityIn.dismissDropDown()
+                    suppressCityWatcher = false
+                }
                 if (r.data?.hasExtra(MapPickerActivity.EXTRA_LAT) == true) {
                     cityLat = r.data?.getDoubleExtra(MapPickerActivity.EXTRA_LAT, 0.0)
                     cityLon = r.data?.getDoubleExtra(MapPickerActivity.EXTRA_LON, 0.0)
                 }
-                spotInput.requestFocus()
+                dialogSpotInput?.requestFocus()
             }
         }
 
@@ -87,10 +87,6 @@ class MainActivity : AppCompatActivity() {
         remindCard = findViewById(R.id.remindCard)
         remindTitle = findViewById(R.id.remindTitle)
         remindList = findViewById(R.id.remindList)
-        cityLayout = findViewById(R.id.cityLayout)
-        spotLayout = findViewById(R.id.spotLayout)
-        cityInput = findViewById(R.id.cityInput)
-        spotInput = findViewById(R.id.spotInput)
 
         BottomNav.setup(this, BottomNav.Tab.HOME)
 
@@ -101,7 +97,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.homeSearchBar).setOnClickListener {
             startActivity(Intent(this, SpotsActivity::class.java))
         }
-        findViewById<View>(R.id.quickAdd).setOnClickListener { cityInput.requestFocus() }
+        findViewById<View>(R.id.quickAdd).setOnClickListener { showAddSpotDialog() }
         findViewById<View>(R.id.quickTrip).setOnClickListener {
             startActivity(Intent(this, SpotsActivity::class.java))
         }
@@ -114,55 +110,6 @@ class MainActivity : AppCompatActivity() {
 
         cityAdapter = NoFilterAdapter(this)
         spotAdapter = NoFilterAdapter(this)
-        cityInput.setAdapter(cityAdapter)
-        spotInput.setAdapter(spotAdapter)
-        cityInput.threshold = 2
-        spotInput.threshold = 2
-
-        cityInput.setOnItemClickListener { _, _, position, _ ->
-            val s = citySuggestions.getOrNull(position) ?: return@setOnItemClickListener
-            cityLat = s.lat
-            cityLon = s.lon
-            suppressCityWatcher = true
-            cityInput.setText(s.name)
-            cityInput.setSelection(cityInput.text?.length ?: 0)
-            cityInput.dismissDropDown()
-            suppressCityWatcher = false
-        }
-        spotInput.setOnItemClickListener { _, _, position, _ ->
-            val s = spotSuggestions.getOrNull(position) ?: return@setOnItemClickListener
-            suppressSpotWatcher = true
-            spotInput.setText(s.name)
-            spotInput.setSelection(spotInput.text?.length ?: 0)
-            spotInput.dismissDropDown()
-            suppressSpotWatcher = false
-        }
-
-        cityInput.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
-            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
-            override fun afterTextChanged(s: Editable?) {
-                if (suppressCityWatcher) return
-                cityLat = null; cityLon = null
-                val q = s?.toString().orEmpty()
-                citySuggestRunnable?.let { mainHandler.removeCallbacks(it) }
-                val r = Runnable { fetchCitySuggestions(q) }
-                citySuggestRunnable = r
-                mainHandler.postDelayed(r, 350)
-            }
-        })
-        spotInput.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
-            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
-            override fun afterTextChanged(s: Editable?) {
-                if (suppressSpotWatcher) return
-                val q = s?.toString().orEmpty()
-                spotSuggestRunnable?.let { mainHandler.removeCallbacks(it) }
-                val r = Runnable { fetchSpotSuggestions(q) }
-                spotSuggestRunnable = r
-                mainHandler.postDelayed(r, 350)
-            }
-        })
 
         findViewById<View>(R.id.btnSettings).setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
@@ -171,16 +118,94 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
         findViewById<View>(R.id.btnCheck).setOnClickListener { onReady() }
-        findViewById<View>(R.id.btnAdd).setOnClickListener { addSpot() }
-        findViewById<View>(R.id.btnMap).setOnClickListener {
-            mapLauncher.launch(Intent(this, MapPickerActivity::class.java))
-        }
         findViewById<View>(R.id.btnGotIt).setOnClickListener {
             dismissedKey = currentKey
             renderReminder()
         }
 
         Notifier.ensureChannel(this)
+    }
+
+    /** "Add a spot" now opens as a popup instead of taking up permanent space on the Home screen. */
+    private fun showAddSpotDialog() {
+        val view = layoutInflater.inflate(R.layout.dialog_add_spot, null)
+        val cityIn = view.findViewById<android.widget.AutoCompleteTextView>(R.id.cityInput)
+        val spotIn = view.findViewById<android.widget.AutoCompleteTextView>(R.id.spotInput)
+
+        dialogCityInput = cityIn
+        dialogSpotInput = spotIn
+        cityLat = null
+        cityLon = null
+
+        cityIn.setAdapter(cityAdapter)
+        spotIn.setAdapter(spotAdapter)
+        cityIn.threshold = 2
+        spotIn.threshold = 2
+
+        cityIn.setOnItemClickListener { _, _, position, _ ->
+            val s = citySuggestions.getOrNull(position) ?: return@setOnItemClickListener
+            cityLat = s.lat
+            cityLon = s.lon
+            suppressCityWatcher = true
+            cityIn.setText(s.name)
+            cityIn.setSelection(cityIn.text?.length ?: 0)
+            cityIn.dismissDropDown()
+            suppressCityWatcher = false
+        }
+        spotIn.setOnItemClickListener { _, _, position, _ ->
+            val s = spotSuggestions.getOrNull(position) ?: return@setOnItemClickListener
+            suppressSpotWatcher = true
+            spotIn.setText(s.name)
+            spotIn.setSelection(spotIn.text?.length ?: 0)
+            spotIn.dismissDropDown()
+            suppressSpotWatcher = false
+        }
+        cityIn.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                if (suppressCityWatcher) return
+                cityLat = null; cityLon = null
+                val q = s?.toString().orEmpty()
+                citySuggestRunnable?.let { mainHandler.removeCallbacks(it) }
+                val r = Runnable { fetchCitySuggestions(cityIn, q) }
+                citySuggestRunnable = r
+                mainHandler.postDelayed(r, 350)
+            }
+        })
+        spotIn.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                if (suppressSpotWatcher) return
+                val q = s?.toString().orEmpty()
+                spotSuggestRunnable?.let { mainHandler.removeCallbacks(it) }
+                val r = Runnable { fetchSpotSuggestions(spotIn, q) }
+                spotSuggestRunnable = r
+                mainHandler.postDelayed(r, 350)
+            }
+        })
+        view.findViewById<View>(R.id.btnMap).setOnClickListener {
+            mapLauncher.launch(Intent(this, MapPickerActivity::class.java))
+        }
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Add a spot")
+            .setView(view)
+            .setPositiveButton("Save spot", null)
+            .setNegativeButton("Cancel", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                if (addSpot(cityIn, spotIn)) dialog.dismiss()
+            }
+        }
+        dialog.setOnDismissListener {
+            dialogCityInput = null
+            dialogSpotInput = null
+        }
+        dialog.show()
+        cityIn.requestFocus()
     }
 
     override fun onResume() {
@@ -336,13 +361,14 @@ class MainActivity : AppCompatActivity() {
 
     // ---------- Add / render ----------
 
-    private fun addSpot() {
+    /** Returns true on success, so the caller knows whether to dismiss the dialog. */
+    private fun addSpot(cityInput: android.widget.AutoCompleteTextView, spotInput: android.widget.AutoCompleteTextView): Boolean {
         val city = cityInput.text?.toString()?.trim().orEmpty()
         val spot = spotInput.text?.toString()?.trim().orEmpty()
-        if (city.isEmpty()) { toast("Enter a city name"); return }
-        if (spot.isEmpty()) { toast("Enter a spot name"); return }
+        if (city.isEmpty()) { toast("Enter a city name"); return false }
+        if (spot.isEmpty()) { toast("Enter a spot name"); return false }
         val key = Store.norm(city)
-        if (key.isEmpty()) { toast("Use letters or numbers for the city"); return }
+        if (key.isEmpty()) { toast("Use letters or numbers for the city"); return false }
 
         val list = Store.load(this)
         val entry = list.firstOrNull { it.key == key }
@@ -351,36 +377,37 @@ class MainActivity : AppCompatActivity() {
             entry.spots.add(Spot(Store.titleCase(spot), false))
         }
         Store.save(this, list)
-        spotInput.setText("")
-        spotInput.requestFocus()
+        toast("Spot saved.")
 
         // If you are already in this city, show its reminder right away
         dismissedKey = null
         recomputeMatch()
+        renderUpcoming()
+        return true
     }
 
-    private fun fetchCitySuggestions(query: String) {
+    private fun fetchCitySuggestions(input: android.widget.AutoCompleteTextView, query: String) {
         if (query.trim().length < 2) return
         io.execute {
             val hits = Osm.suggestCities(query)
             runOnUiThread {
-                if (cityInput.text?.toString() != query) return@runOnUiThread
+                if (input.text?.toString() != query) return@runOnUiThread
                 citySuggestions = hits
                 cityAdapter.replaceAll(hits.map { it.label })
-                if (hits.isNotEmpty() && cityInput.hasFocus()) cityInput.showDropDown()
+                if (hits.isNotEmpty() && input.hasFocus()) input.showDropDown()
             }
         }
     }
 
-    private fun fetchSpotSuggestions(query: String) {
+    private fun fetchSpotSuggestions(input: android.widget.AutoCompleteTextView, query: String) {
         if (query.trim().length < 2) return
         io.execute {
             val hits = Osm.suggestSpots(query, cityLat, cityLon)
             runOnUiThread {
-                if (spotInput.text?.toString() != query) return@runOnUiThread
+                if (input.text?.toString() != query) return@runOnUiThread
                 spotSuggestions = hits
                 spotAdapter.replaceAll(hits.map { it.label })
-                if (hits.isNotEmpty() && spotInput.hasFocus()) spotInput.showDropDown()
+                if (hits.isNotEmpty() && input.hasFocus()) input.showDropDown()
             }
         }
     }
@@ -409,8 +436,18 @@ class MainActivity : AppCompatActivity() {
                 textSize = 16f
                 setTextColor(android.graphics.Color.WHITE)
                 setPadding(dp(8), dp(10), dp(8), dp(10))
+                // The default checkbox tint can end up nearly invisible against the saffron
+                // card background, so force a high-contrast white box + a strikethrough on the
+                // text itself — that way "done" is unmistakable even if the tint fails on a device.
+                buttonTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
+                paintFlags = if (s.done) paintFlags or android.graphics.Paint.STRIKE_THRU_TEXT_FLAG
+                    else paintFlags and android.graphics.Paint.STRIKE_THRU_TEXT_FLAG.inv()
+                alpha = if (s.done) 0.7f else 1f
                 setOnCheckedChangeListener { _, checked ->
                     s.done = checked
+                    paintFlags = if (checked) paintFlags or android.graphics.Paint.STRIKE_THRU_TEXT_FLAG
+                        else paintFlags and android.graphics.Paint.STRIKE_THRU_TEXT_FLAG.inv()
+                    alpha = if (checked) 0.7f else 1f
                     val all = Store.load(this@MainActivity)
                     all.firstOrNull { it.key == city.key }
                         ?.spots?.firstOrNull { it.name == s.name }?.done = checked

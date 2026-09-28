@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="20dp"
+    android:paddingEnd="20dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="4dp">
+
+    <LinearLayout
+        android:id="@+id/cityLayout"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@drawable/bg_field_row"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp">
+
+        <android.widget.AutoCompleteTextView
+            android:id="@+id/cityInput"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@null"
+            android:completionThreshold="2"
+            android:dropDownWidth="match_parent"
+            android:hint="City name"
+            android:imeOptions="actionNext"
+            android:inputType="textCapWords"
+            android:singleLine="true"
+            android:textColor="@color/ink"
+            android:textColorHint="@color/river_soft"
+            android:textSize="16sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="City"
+            android:textColor="@color/river_soft"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnMap"
+        style="?attr/materialButtonOutlinedStyle"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_marginTop="8dp"
+        android:text="Pick city on map"
+        android:textAllCaps="false"
+        android:textSize="13sp" />
+
+    <LinearLayout
+        android:id="@+id/spotLayout"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_field_row"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp">
+
+        <android.widget.AutoCompleteTextView
+            android:id="@+id/spotInput"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@null"
+            android:completionThreshold="2"
+            android:dropDownWidth="match_parent"
+            android:hint="Spot name"
+            android:imeOptions="actionDone"
+            android:inputType="textCapWords"
+            android:singleLine="true"
+            android:textColor="@color/ink"
+            android:textColorHint="@color/river_soft"
+            android:textSize="16sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="Spot"
+            android:textColor="@color/river_soft"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="Type a few letters for suggestions."
+        android:textColor="@color/river_soft"
+        android:textSize="12sp" />
+</LinearLayout>

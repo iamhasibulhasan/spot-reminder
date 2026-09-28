@@ -23,6 +23,8 @@ class SpotsActivity : AppCompatActivity() {
     private lateinit var spotsList: LinearLayout
     private lateinit var activeBanner: LinearLayout
     private lateinit var activeSpot: TextView
+    private lateinit var activeStats: TextView
+    private lateinit var activeCostsList: LinearLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,11 +33,16 @@ class SpotsActivity : AppCompatActivity() {
         spotsList = findViewById(R.id.spotsList)
         activeBanner = findViewById(R.id.activeBanner)
         activeSpot = findViewById(R.id.activeSpot)
+        activeStats = findViewById(R.id.activeStats)
+        activeCostsList = findViewById(R.id.activeCostsList)
 
         BottomNav.setup(this, BottomNav.Tab.SPOTS)
 
         findViewById<View>(R.id.btnEndActive).setOnClickListener {
             TripStore.activeTrip(this)?.let { showEndTripDialog(it) }
+        }
+        findViewById<View>(R.id.btnAddCost).setOnClickListener {
+            TripStore.activeTrip(this)?.let { showAddCostDialog(it) }
         }
     }
 
@@ -106,6 +113,29 @@ class SpotsActivity : AppCompatActivity() {
         } else {
             activeBanner.visibility = View.VISIBLE
             activeSpot.text = active.spotName + " · " + active.cityName
+            activeStats.text = "%.1f km so far · %.0f spent".format(active.distanceKm, active.totalCost)
+            activeCostsList.removeAllViews()
+            for (c in active.costs) {
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { topMargin = dp(4) }
+                }
+                row.addView(TextView(this).apply {
+                    text = c.category
+                    textSize = 13f
+                    setTextColor(Color.WHITE)
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                })
+                row.addView(TextView(this).apply {
+                    text = "%.0f".format(c.amount)
+                    textSize = 13f
+                    setTypeface(typeface, Typeface.BOLD)
+                    setTextColor(Color.WHITE)
+                })
+                activeCostsList.addView(row)
+            }
         }
 
         spotsList.removeAllViews()
@@ -238,7 +268,14 @@ class SpotsActivity : AppCompatActivity() {
                     if (isActiveHere) {
                         row.addView(iconButton(R.drawable.ic_stat_pin, color(R.color.accent)) { showEndTripDialog(active!!) })
                     } else if (active == null) {
-                        row.addView(iconButton(R.drawable.ic_add, color(R.color.accent)) { startTrip(c.key, c.name, s.name) })
+                        row.addView(MaterialButton(this, null, android.R.attr.borderlessButtonStyle).apply {
+                            text = "Start trip"
+                            isAllCaps = false
+                            textSize = 12f
+                            setTextColor(color(R.color.accent))
+                            setPadding(dp(10), 0, dp(2), 0)
+                            setOnClickListener { startTrip(c.key, c.name, s.name) }
+                        })
                     }
                     row.addView(iconButton(R.drawable.ic_edit, color(R.color.river_soft)) { showEditSpotDialog(c.key, s.name) })
                     row.addView(iconButton(R.drawable.ic_delete, color(R.color.brick)) {
@@ -306,32 +343,15 @@ class SpotsActivity : AppCompatActivity() {
         render()
     }
 
+    /** Costs are added as they happen via showAddCostDialog; ending a trip just confirms and saves them. */
     private fun showEndTripDialog(trip: Trip) {
-        val amountInputs = mutableMapOf<String, TextInputEditText>()
-        val fieldsLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        for (cat in TRIP_COST_CATEGORIES) {
-            val (row, input) = fieldRow(cat, android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL)
-            input.hint = "0"
-            amountInputs[cat] = input
-            fieldsLayout.addView(row)
-        }
-        val wrap = FrameLayout(this).apply {
-            val pad = dp(20)
-            setPadding(pad, dp(8), pad, 0)
-            addView(fieldsLayout)
-        }
-
         AlertDialog.Builder(this)
-            .setTitle("End trip — add costs")
-            .setView(wrap)
-            .setPositiveButton("Save trip") { _, _ ->
-                val costs = mutableListOf<CostItem>()
-                for ((cat, input) in amountInputs) {
-                    val v = input.text?.toString()?.trim()?.toDoubleOrNull()
-                    if (v != null && v > 0) costs.add(CostItem(cat, v))
-                }
+            .setTitle("End trip?")
+            .setMessage(
+                "%.1f km recorded · %.0f spent so far.".format(trip.distanceKm, trip.totalCost)
+            )
+            .setPositiveButton("End trip") { _, _ ->
                 trip.endTime = System.currentTimeMillis()
-                trip.costs = costs
                 TripTrackingService.stop(this)
                 TripStore.addTrip(this, trip)
                 TripStore.setActiveTrip(this, null)
@@ -340,6 +360,53 @@ class SpotsActivity : AppCompatActivity() {
             }
             .setNegativeButton("Keep recording", null)
             .show()
+    }
+
+    /** Lets you log one cost (e.g. "Bus" · 10) at any point during an active trip. Call as many times as needed. */
+    private fun showAddCostDialog(trip: Trip) {
+        val (catRow, catInput) = fieldRow("Category", android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS)
+        catInput.hint = "e.g. Bus, Food"
+        val chipsRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        for (cat in TRIP_COST_CATEGORIES) {
+            chipsRow.addView(textButton(cat, R.color.river_soft) {
+                catInput.setText(cat)
+                catInput.setSelection(catInput.text?.length ?: 0)
+            })
+        }
+        val (amtRow, amtInput) = fieldRow("Amount", android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL)
+
+        val fieldsLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(chipsRow)
+            addView(catRow)
+            addView(amtRow)
+        }
+        val wrap = FrameLayout(this).apply {
+            val pad = dp(20)
+            setPadding(pad, dp(8), pad, 0)
+            addView(fieldsLayout)
+        }
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Add a cost")
+            .setView(wrap)
+            .setPositiveButton("Add", null)
+            .setNegativeButton("Cancel", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val cat = catInput.text?.toString()?.trim().orEmpty()
+                val amt = amtInput.text?.toString()?.trim()?.toDoubleOrNull()
+                if (cat.isEmpty() || amt == null || amt <= 0) {
+                    android.widget.Toast.makeText(this, "Enter a category and amount", android.widget.Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                TripStore.addCostToActiveTrip(this, CostItem(Store.titleCase(cat), amt))
+                render()
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
     }
 
     private fun showEditSpotDialog(cityKey: String, oldName: String) {
