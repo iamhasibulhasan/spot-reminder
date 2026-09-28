@@ -1,0 +1,16 @@
+<resources>
+    <style name="ShapeAppearanceOverlay.SpotReminder.TextField" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">14dp</item>
+    </style>
+
+    <style name="Widget.SpotReminder.TextField" parent="Widget.Material3.TextInputLayout.FilledBox.Dense">
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearanceOverlay.SpotReminder.TextField</item>
+        <item name="boxBackgroundColor">@color/field</item>
+        <item name="boxStrokeColor">@color/river</item>
+        <item name="boxStrokeWidthFocused">1.5dp</item>
+        <item name="hintTextColor">@color/river_soft</item>
+        <item name="android:textColorHint">@color/river_soft</item>
+        <item name="colorControlNormal">@color/field_stroke</item>
+    </style>
+</resources>
