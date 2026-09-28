@@ -39,7 +39,9 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
                 android:background="@drawable/bg_river"
+                android:elevation="2dp"
                 android:orientation="vertical"
+                android:outlineProvider="background"
                 android:padding="14dp"
                 android:visibility="gone">
 

@@ -75,4 +75,13 @@ object TripStore {
         t.costs.add(item)
         setActiveTrip(ctx, t)
     }
+
+    /** Adds one cost line item to an already-saved (completed) trip, found by id. */
+    @Synchronized
+    fun addCostToTrip(ctx: Context, tripId: String, item: CostItem) {
+        val all = loadTrips(ctx)
+        val trip = all.firstOrNull { it.id == tripId } ?: return
+        trip.costs.add(item)
+        saveTrips(ctx, all)
+    }
 }

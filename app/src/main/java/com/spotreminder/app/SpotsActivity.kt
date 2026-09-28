@@ -7,6 +7,7 @@ import android.graphics.Typeface
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
+import android.view.ViewOutlineProvider
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -42,7 +43,12 @@ class SpotsActivity : AppCompatActivity() {
             TripStore.activeTrip(this)?.let { showEndTripDialog(it) }
         }
         findViewById<View>(R.id.btnAddCost).setOnClickListener {
-            TripStore.activeTrip(this)?.let { showAddCostDialog(it) }
+            if (TripStore.activeTrip(this) != null) {
+                CostDialogs.showAddCost(this) { item ->
+                    TripStore.addCostToActiveTrip(this, item)
+                    render()
+                }
+            }
         }
     }
 
@@ -81,14 +87,6 @@ class SpotsActivity : AppCompatActivity() {
         })
         return row to input
     }
-
-    private fun textButton(label: String, c: Int = R.color.brick, onClick: () -> Unit): MaterialButton =
-        MaterialButton(this, null, android.R.attr.borderlessButtonStyle).apply {
-            text = label
-            isAllCaps = false
-            setTextColor(color(c))
-            setOnClickListener { onClick() }
-        }
 
     /** A small tappable icon (edit/delete/add/chevron) with a ripple, used instead of text buttons. */
     private fun iconButton(drawableRes: Int, tintColor: Int, sizeDp: Int = 36, onClick: (() -> Unit)? = null): View =
@@ -156,6 +154,8 @@ class SpotsActivity : AppCompatActivity() {
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 background = ContextCompat.getDrawable(this@SpotsActivity, R.drawable.bg_paper)
+                outlineProvider = ViewOutlineProvider.BACKGROUND
+                elevation = dp(2).toFloat()
                 setPadding(dp(14), dp(6), dp(10), dp(6))
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
@@ -252,6 +252,8 @@ class SpotsActivity : AppCompatActivity() {
                     textCol.addView(TextView(this).apply {
                         text = s.name
                         textSize = 15f
+                        maxLines = 1
+                        ellipsize = android.text.TextUtils.TruncateAt.END
                         setTextColor(color(R.color.ink))
                     })
                     textCol.addView(TextView(this).apply {
@@ -261,6 +263,8 @@ class SpotsActivity : AppCompatActivity() {
                             else -> "${trips.size} trip${if (trips.size == 1) "" else "s"} · ${"%.0f".format(totalCost)} spent"
                         }
                         textSize = 12f
+                        maxLines = 1
+                        ellipsize = android.text.TextUtils.TruncateAt.END
                         setTextColor(if (isActiveHere) color(R.color.accent) else color(R.color.river_soft))
                     })
                     row.addView(textCol)
@@ -277,6 +281,17 @@ class SpotsActivity : AppCompatActivity() {
                             setOnClickListener { startTrip(c.key, c.name, s.name) }
                         })
                     }
+                    // "Add cost" works whether this spot has a trip running right now or not.
+                    row.addView(iconButton(R.drawable.ic_cost, color(R.color.accent)) {
+                        if (isActiveHere) {
+                            CostDialogs.showAddCost(this) { item ->
+                                TripStore.addCostToActiveTrip(this, item)
+                                render()
+                            }
+                        } else {
+                            addQuickCost(c.key, c.name, s.name)
+                        }
+                    })
                     row.addView(iconButton(R.drawable.ic_edit, color(R.color.river_soft)) { showEditSpotDialog(c.key, s.name) })
                     row.addView(iconButton(R.drawable.ic_delete, color(R.color.brick)) {
                         val all = Store.load(this)
@@ -343,7 +358,7 @@ class SpotsActivity : AppCompatActivity() {
         render()
     }
 
-    /** Costs are added as they happen via showAddCostDialog; ending a trip just confirms and saves them. */
+    /** Costs are added as they happen via CostDialogs; ending a trip just confirms and saves them. */
     private fun showEndTripDialog(trip: Trip) {
         AlertDialog.Builder(this)
             .setTitle("End trip?")
@@ -362,51 +377,27 @@ class SpotsActivity : AppCompatActivity() {
             .show()
     }
 
-    /** Lets you log one cost (e.g. "Bus" · 10) at any point during an active trip. Call as many times as needed. */
-    private fun showAddCostDialog(trip: Trip) {
-        val (catRow, catInput) = fieldRow("Category", android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS)
-        catInput.hint = "e.g. Bus, Food"
-        val chipsRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        for (cat in TRIP_COST_CATEGORIES) {
-            chipsRow.addView(textButton(cat, R.color.river_soft) {
-                catInput.setText(cat)
-                catInput.setSelection(catInput.text?.length ?: 0)
-            })
+    /**
+     * Logs a cost for a spot that has no trip running right now. It's saved as its own
+     * zero-duration trip record, so it shows up in history and stats immediately — useful for
+     * a quick expense you don't want to wait to start a full trip for.
+     */
+    private fun addQuickCost(cityKey: String, cityName: String, spotName: String) {
+        CostDialogs.showAddCost(this) { item ->
+            val now = System.currentTimeMillis()
+            val trip = Trip(
+                id = UUID.randomUUID().toString(),
+                cityKey = cityKey,
+                cityName = cityName,
+                spotName = spotName,
+                startTime = now,
+                endTime = now,
+                costs = mutableListOf(item)
+            )
+            TripStore.addTrip(this, trip)
+            render()
+            android.widget.Toast.makeText(this, "Cost saved.", android.widget.Toast.LENGTH_SHORT).show()
         }
-        val (amtRow, amtInput) = fieldRow("Amount", android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL)
-
-        val fieldsLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(chipsRow)
-            addView(catRow)
-            addView(amtRow)
-        }
-        val wrap = FrameLayout(this).apply {
-            val pad = dp(20)
-            setPadding(pad, dp(8), pad, 0)
-            addView(fieldsLayout)
-        }
-
-        val dialog = AlertDialog.Builder(this)
-            .setTitle("Add a cost")
-            .setView(wrap)
-            .setPositiveButton("Add", null)
-            .setNegativeButton("Cancel", null)
-            .create()
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val cat = catInput.text?.toString()?.trim().orEmpty()
-                val amt = amtInput.text?.toString()?.trim()?.toDoubleOrNull()
-                if (cat.isEmpty() || amt == null || amt <= 0) {
-                    android.widget.Toast.makeText(this, "Enter a category and amount", android.widget.Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-                TripStore.addCostToActiveTrip(this, CostItem(Store.titleCase(cat), amt))
-                render()
-                dialog.dismiss()
-            }
-        }
-        dialog.show()
     }
 
     private fun showEditSpotDialog(cityKey: String, oldName: String) {

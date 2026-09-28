@@ -43,7 +43,9 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:background="@drawable/bg_saffron"
+                    android:elevation="2dp"
                     android:orientation="vertical"
+                    android:outlineProvider="background"
                     android:padding="14dp">
 
                     <TextView
@@ -69,7 +71,9 @@
                     android:layout_marginStart="10dp"
                     android:layout_weight="1"
                     android:background="@drawable/bg_river"
+                    android:elevation="2dp"
                     android:orientation="vertical"
+                    android:outlineProvider="background"
                     android:padding="14dp">
 
                     <TextView
@@ -95,7 +99,9 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
                 android:background="@drawable/bg_paper"
+                android:elevation="2dp"
                 android:orientation="vertical"
+                android:outlineProvider="background"
                 android:padding="14dp">
 
                 <TextView

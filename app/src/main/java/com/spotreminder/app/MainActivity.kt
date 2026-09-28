@@ -244,6 +244,8 @@ class MainActivity : AppCompatActivity() {
         for ((c, s) in upcoming.take(10)) {
             val card = FrameLayout(this).apply {
                 background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_deal_card)
+                outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
+                elevation = dp(2).toFloat()
                 layoutParams = LinearLayout.LayoutParams(dp(150), dp(110)).apply { marginEnd = dp(10) }
                 isClickable = true
                 setOnClickListener {

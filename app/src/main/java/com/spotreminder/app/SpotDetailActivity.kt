@@ -5,6 +5,8 @@ import android.graphics.Typeface
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
+import android.view.ViewOutlineProvider
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -63,6 +65,8 @@ class SpotDetailActivity : AppCompatActivity() {
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 background = ContextCompat.getDrawable(this@SpotDetailActivity, R.drawable.bg_paper)
+                outlineProvider = ViewOutlineProvider.BACKGROUND
+                elevation = dp(2).toFloat()
                 setPadding(dp(14), dp(12), dp(14), dp(12))
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
@@ -72,12 +76,33 @@ class SpotDetailActivity : AppCompatActivity() {
                     startActivity(Intent(this@SpotDetailActivity, TripMapActivity::class.java).putExtra("tripId", t.id))
                 }
             }
-            card.addView(TextView(this).apply {
+            val headerRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            headerRow.addView(TextView(this).apply {
                 text = df.format(java.util.Date(t.startTime))
                 textSize = 13f
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(color(R.color.ink))
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             })
+            // Lets you log a cost you forgot to add while this (already-finished) trip was active.
+            headerRow.addView(ImageView(this).apply {
+                setImageResource(R.drawable.ic_cost)
+                setColorFilter(color(R.color.accent))
+                val pad = dp(6)
+                setPadding(pad, pad, pad, pad)
+                background = ContextCompat.getDrawable(this@SpotDetailActivity, android.R.drawable.list_selector_background)
+                layoutParams = LinearLayout.LayoutParams(dp(32), dp(32))
+                setOnClickListener {
+                    CostDialogs.showAddCost(this@SpotDetailActivity) { item ->
+                        TripStore.addCostToTrip(this@SpotDetailActivity, t.id, item)
+                        render()
+                    }
+                }
+            })
+            card.addView(headerRow)
             val statsRow = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
