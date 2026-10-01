@@ -25,21 +25,27 @@ Edit source files directly under `app/src/main/` like any normal Android project
 ## App architecture
 
 - `App.kt` — Application class, applies saved theme on launch.
-- `MainActivity.kt` — Home screen: detected-city status, quick-add city+spot form (OSM autocomplete via `Osm.kt`), kicks off the periodic WorkManager job.
-- `SpotsActivity.kt` / `SpotDetailActivity.kt` — city/spot list and per-city checklist + trip start/stop.
-- `MapPickerActivity.kt` / `TripMapActivity.kt` — osmdroid map screens (pick a location / replay a trip route).
+- `MainActivity.kt` — Home screen: detected-city status, "Add a spot" popup (OSM autocomplete via `Osm.kt`), kicks off the periodic WorkManager job.
+- `SpotsActivity.kt` / `SpotDetailActivity.kt` — city/spot list and per-spot trip history; start/end a trip, add costs (live during a trip or after it's finished), navigate to a spot.
+- `CostDialogs.kt` — the shared "Add a cost" popup used from both the active-trip banner and a finished trip's history card.
+- `MapPickerActivity.kt` / `TripMapActivity.kt` / `NavigateActivity.kt` — osmdroid map screens: pick a location, replay a completed trip's recorded route, or navigate from your current location to a saved spot (driving route + distance/time via `Routing.kt`, no live traffic).
+- `Routing.kt` — calls the free public OSRM demo server for a driving route between two points (geometry, distance, duration). No traffic data; that needs a paid API this project doesn't use.
 - `StatsActivity.kt` — aggregates `Trip` records: distance (haversine), cost, per-category breakdown.
 - `ProfileActivity.kt` — local profile fields + Google Sign-In, triggers `DriveBackup.kt`.
 - `SettingsActivity.kt` — theme + location/notification permission management.
-- `Store.kt` — SharedPreferences-backed JSON store for cities/spots/theme/profile/last-notified-city. `rawData()`/`setRawData()` exist specifically for Drive backup/restore serialization.
-- `TripStore.kt` / `Trip.kt` — separate SharedPreferences-backed store for `Trip` records (path points, cost items, note) + haversine distance calc.
-- `TripTrackingService.kt` — foreground Service recording GPS points (~10s/15m interval) during an active trip.
-- `LocationChecker.kt` — core arrival-detection logic: last/fresh GPS fix → reverse geocode (Android `Geocoder`, falls back to Nominatim REST) → normalize/fuzzy-match against saved city keys → `Notifier`.
+- `Store.kt` — SharedPreferences-backed JSON store for cities/spots/theme/profile/last-notified-city. `CityEntry`/`Spot` carry optional `lat`/`lon` (set when added via map pick or a search suggestion, or geocoded once on first navigate and cached back). `rawData()`/`setRawData()` exist specifically for Drive backup/restore serialization.
+- `TripStore.kt` / `Trip.kt` — separate SharedPreferences-backed store for `Trip` records (path points, cost items, note) + haversine distance calc. Costs can be appended to the active trip or to an already-saved one (`addCostToActiveTrip` / `addCostToTrip`).
+- `TripTrackingService.kt` — foreground Service recording GPS points during an active trip; tracks a single location provider (GPS preferred) and filters out low-accuracy/implausible-speed fixes so the recorded route doesn't zig-zag.
+- `LocationChecker.kt` — core arrival-detection logic: last/fresh GPS fix → reverse geocode (Android `Geocoder`, falls back to Nominatim REST) → normalize/fuzzy-match against saved city keys → `Notifier`. `currentLocation()` is the public entry point other screens (e.g. `NavigateActivity`) use to get a one-off fix.
 - `LocationWorker.kt` — WorkManager `Worker` running `LocationChecker` roughly every 15 minutes.
 - `Notifier.kt` — builds the "Welcome to `<city>`! You wanted to visit: ..." notification (channel `arrival`).
 - `DriveBackup.kt` — raw Drive v3 REST calls to back up/restore the `Store` JSON blob to the signed-in user's private `appDataFolder`.
 
 No Room/SQLite, no Retrofit/OkHttp, no DI framework, no Navigation component, no tests — everything is hand-rolled with `Intent`-based navigation and `HttpURLConnection`.
+
+## Visual design
+
+Blue + green palette matching a travel-app reference: `river` (blue) for hero headers/primary info tiles, `accent` (green) for CTAs, the active bottom-nav tab, and ratings-style emphasis. Both live in `values/colors.xml` (and `values-night/colors.xml` for dark mode) — re-skinning the app again means editing those tokens, not hunting through every layout, since drawables like `bg_river`/`bg_saffron`/`bg_hero_header` already reference them by name. Every top-level screen opens with a `bg_hero_header` band (blue, rounded bottom corners) holding its title; card surfaces use `bg_paper` with a small `elevation` + `outlineProvider="background"` for a shadow that follows the rounded corners instead of a visible border.
 
 ## CI / auto-build
 

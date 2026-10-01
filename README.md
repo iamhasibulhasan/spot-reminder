@@ -4,9 +4,10 @@
 
 It has grown from a simple arrival-reminder into a small travel companion app:
 
-- **Home** — quick-add a city and its spots (with OpenStreetMap-based autocomplete), see the currently detected city, and trigger a manual location check.
+- **Home** — add a city and spot via a popup (OpenStreetMap-based autocomplete), see the currently detected city, and trigger a manual location check.
 - **Spots** — browse saved cities and check off spots as you visit them.
-- **Trip tracking** — start a trip from a spot and the app records your GPS path in the background (foreground service), plus lets you log costs by category (Fuel, Food, Tickets, Other) and a note.
+- **Trip tracking** — start a trip from a spot and the app records your GPS path in the background (foreground service). Costs can be logged as many times as you like, during an active trip or added later to a finished one — no fixed category list required.
+- **Navigate to a spot** — see your current location and the spot on a map with the real driving route, distance and estimated time (via the free OSRM routing service — no live traffic; see "Tech stack" below), plus a recenter button.
 - **Stats** — total distance traveled (haversine), total cost, trip count, and a cost breakdown by category.
 - **Map** — pick a city location on an OpenStreetMap view, or replay a trip's recorded route.
 - **Profile** — a local profile (name/phone/address) plus optional Google Sign-In, used to back up and restore your data to your own Google Drive.
@@ -52,7 +53,7 @@ This is a standard Gradle Android project rooted at the repo root:
 | Language | Kotlin |
 | UI | Classic Android Views (XML layouts), Material Components, ConstraintLayout — no Jetpack Compose |
 | Background work | WorkManager (periodic ~15 min location check), a foreground Service (trip GPS tracking) |
-| Maps | osmdroid (OpenStreetMap tiles), Nominatim REST API for search/reverse-geocoding |
+| Maps | osmdroid (OpenStreetMap tiles), Nominatim REST API for search/reverse-geocoding, free public OSRM demo server for driving routes/ETA (no live traffic — that needs a paid API) |
 | Auth / backup | Google Sign-In + raw Drive v3 REST calls to the user's private `appDataFolder` |
 | Persistence | `SharedPreferences`, storing hand-rolled JSON blobs (no Room/SQLite) |
 | Networking | Raw `HttpURLConnection` (no Retrofit/OkHttp) |
