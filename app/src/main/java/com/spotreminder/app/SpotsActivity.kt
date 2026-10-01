@@ -237,8 +237,9 @@ class SpotsActivity : AppCompatActivity() {
                     row.addView(ImageView(this).apply {
                         setImageResource(if (trips.isNotEmpty()) R.drawable.ic_check_small else R.drawable.ic_pin_small)
                         background = ContextCompat.getDrawable(this@SpotsActivity, R.drawable.bg_icon_circle)
+                        // Visited spots badge green (matches the accent), unvisited ones badge blue (matches the hero color).
                         backgroundTintList = android.content.res.ColorStateList.valueOf(
-                            if (trips.isNotEmpty()) android.graphics.Color.parseColor("#4CAF7D") else color(R.color.accent)
+                            if (trips.isNotEmpty()) color(R.color.accent) else color(R.color.river)
                         )
                         val pad = dp(7)
                         setPadding(pad, pad, pad, pad)

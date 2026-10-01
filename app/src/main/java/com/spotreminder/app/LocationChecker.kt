@@ -27,6 +27,13 @@ object LocationChecker {
         ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
             ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
+    /** Blocking. Call from a background thread. Null if permission/location/providers are unavailable. */
+    fun currentLocation(ctx: Context): Location? {
+        if (!hasLocationPermission(ctx)) return null
+        val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        return getLocation(ctx, lm)
+    }
+
     /** True when a detected place name matches a saved city key (both normalised). */
     fun matches(placeName: String, cityKey: String): Boolean {
         val n = Store.norm(placeName)

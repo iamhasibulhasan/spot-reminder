@@ -14,8 +14,10 @@
         android:layout_gravity="top"
         android:layout_margin="10dp"
         android:background="@drawable/bg_paper"
+        android:elevation="4dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
+        android:outlineProvider="background"
         android:padding="8dp">
 
         <ImageButton
@@ -43,7 +45,9 @@
         android:layout_gravity="bottom"
         android:layout_margin="10dp"
         android:background="@drawable/bg_river"
+        android:elevation="4dp"
         android:orientation="vertical"
+        android:outlineProvider="background"
         android:padding="14dp">
 
         <TextView

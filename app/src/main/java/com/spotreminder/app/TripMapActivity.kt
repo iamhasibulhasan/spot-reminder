@@ -59,7 +59,7 @@ class TripMapActivity : AppCompatActivity() {
         val points = t.path.map { GeoPoint(it.lat, it.lon) }
         val line = Polyline(map).apply {
             setPoints(points)
-            outlinePaint.color = Color.parseColor("#F2A516")
+            outlinePaint.color = Color.parseColor("#2F6FED")
             outlinePaint.strokeWidth = 10f
         }
         map.overlays.add(line)

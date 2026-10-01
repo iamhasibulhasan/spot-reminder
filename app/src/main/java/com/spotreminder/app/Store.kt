@@ -5,8 +5,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.text.Normalizer
 
-data class Spot(var name: String, var done: Boolean = false)
-data class CityEntry(val key: String, val name: String, val spots: MutableList<Spot>)
+/** lat/lon are filled in when known (picked on a map, chosen from a suggestion, or resolved once by
+ *  geocoding) so the spot can be shown on the navigate-to-spot map without asking again. */
+data class Spot(var name: String, var done: Boolean = false, var lat: Double? = null, var lon: Double? = null)
+data class CityEntry(val key: String, val name: String, val spots: MutableList<Spot>, var lat: Double? = null, var lon: Double? = null)
 
 object Store {
     private const val PREFS = "spot_reminder"
@@ -39,9 +41,24 @@ object Store {
                 val sa = o.getJSONArray("spots")
                 for (j in 0 until sa.length()) {
                     val s = sa.getJSONObject(j)
-                    spots.add(Spot(s.getString("name"), s.optBoolean("done", false)))
+                    spots.add(
+                        Spot(
+                            s.getString("name"),
+                            s.optBoolean("done", false),
+                            if (s.has("lat")) s.optDouble("lat") else null,
+                            if (s.has("lon")) s.optDouble("lon") else null
+                        )
+                    )
                 }
-                out.add(CityEntry(o.getString("key"), o.getString("name"), spots))
+                out.add(
+                    CityEntry(
+                        o.getString("key"),
+                        o.getString("name"),
+                        spots,
+                        if (o.has("lat")) o.optDouble("lat") else null,
+                        if (o.has("lon")) o.optDouble("lon") else null
+                    )
+                )
             }
         } catch (e: Exception) {
             // ignore corrupted data
@@ -56,11 +73,15 @@ object Store {
             val o = JSONObject()
             o.put("key", c.key)
             o.put("name", c.name)
+            c.lat?.let { o.put("lat", it) }
+            c.lon?.let { o.put("lon", it) }
             val sa = JSONArray()
             for (s in c.spots) {
                 val so = JSONObject()
                 so.put("name", s.name)
                 so.put("done", s.done)
+                s.lat?.let { so.put("lat", it) }
+                s.lon?.let { so.put("lon", it) }
                 sa.put(so)
             }
             o.put("spots", sa)

@@ -68,6 +68,7 @@ class ProfileActivity : AppCompatActivity() {
 
         avatar.clipToOutline = true
         avatar.outlineProvider = ViewOutlineProvider.BACKGROUND
+        avatar.imageTintList = android.content.res.ColorStateList.valueOf(getColor(R.color.river))
 
         BottomNav.setup(this, BottomNav.Tab.PROFILE)
 
@@ -126,6 +127,7 @@ class ProfileActivity : AppCompatActivity() {
             btnSignIn.visibility = View.VISIBLE
             btnSignOut.visibility = View.GONE
             backupActions.visibility = View.GONE
+            avatar.imageTintList = android.content.res.ColorStateList.valueOf(getColor(R.color.river))
             avatar.setImageResource(R.drawable.ic_person)
             avatar.setPadding(dp(18), dp(18), dp(18), dp(18))
         } else {
@@ -137,6 +139,7 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private fun loadAvatar(uri: Uri?) {
+        avatar.imageTintList = android.content.res.ColorStateList.valueOf(getColor(R.color.river))
         avatar.setImageResource(R.drawable.ic_person)
         avatar.setPadding(dp(18), dp(18), dp(18), dp(18))
         if (uri == null) return
@@ -148,6 +151,7 @@ class ProfileActivity : AppCompatActivity() {
             }
             if (bmp != null) {
                 runOnUiThread {
+                    avatar.imageTintList = null
                     avatar.setPadding(0, 0, 0, 0)
                     avatar.setImageBitmap(bmp)
                 }

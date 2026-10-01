@@ -1,16 +1,18 @@
 <resources>
+    <!-- Blue + green travel-app palette: blue for hero headers/primary info tiles,
+         green as the single CTA/active accent (buttons, selected nav tab, ratings). -->
     <color name="sea">#F5F6FA</color>
     <color name="sea_deep">#ECEEF5</color>
-    <color name="river">#1E2A4A</color>
+    <color name="river">#2F6FED</color>
     <color name="ink">#16213A</color>
     <color name="river_soft">#6B7280</color>
-    <color name="river_light">#C7D0E8</color>
-    <color name="saffron">#FFB020</color>
+    <color name="river_light">#DCE8FF</color>
+    <color name="saffron">#16A34A</color>
     <color name="paper">#FFFFFF</color>
     <color name="field">#F1F2F6</color>
     <color name="field_stroke">#D8DBE3</color>
     <color name="brick">#E5484D</color>
     <color name="line">#E4E6EE</color>
-    <color name="accent">#4C63E0</color>
-    <color name="accent_soft">#EDF0FE</color>
+    <color name="accent">#22C55E</color>
+    <color name="accent_soft">#E6F9ED</color>
 </resources>

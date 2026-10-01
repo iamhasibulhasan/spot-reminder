@@ -31,6 +31,14 @@ class SpotDetailActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.spotTitle).text = spotName
         findViewById<TextView>(R.id.spotSubtitle).text = cityName
         findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
+        findViewById<View>(R.id.btnNavigate).setOnClickListener {
+            startActivity(
+                Intent(this, NavigateActivity::class.java)
+                    .putExtra("cityKey", cityKey)
+                    .putExtra("cityName", cityName)
+                    .putExtra("spotName", spotName)
+            )
+        }
     }
 
     override fun onResume() {

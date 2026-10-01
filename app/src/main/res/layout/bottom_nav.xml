@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="64dp"
+    android:layout_height="68dp"
     android:background="@drawable/bg_navbar"
-    android:elevation="10dp"
-    android:orientation="horizontal">
+    android:elevation="12dp"
+    android:orientation="horizontal"
+    android:outlineProvider="background">
 
     <LinearLayout
         android:id="@+id/navHome"
@@ -29,6 +30,13 @@
             android:layout_marginTop="2dp"
             android:text="Home"
             android:textSize="11sp" />
+
+        <View
+            android:id="@+id/navHomeDot"
+            android:layout_width="16dp"
+            android:layout_height="3dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_nav_indicator" />
     </LinearLayout>
 
     <LinearLayout
@@ -54,6 +62,13 @@
             android:layout_marginTop="2dp"
             android:text="Spots"
             android:textSize="11sp" />
+
+        <View
+            android:id="@+id/navSpotsDot"
+            android:layout_width="16dp"
+            android:layout_height="3dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_nav_indicator" />
     </LinearLayout>
 
     <LinearLayout
@@ -79,6 +94,13 @@
             android:layout_marginTop="2dp"
             android:text="Stats"
             android:textSize="11sp" />
+
+        <View
+            android:id="@+id/navStatsDot"
+            android:layout_width="16dp"
+            android:layout_height="3dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_nav_indicator" />
     </LinearLayout>
 
     <LinearLayout
@@ -104,5 +126,12 @@
             android:layout_marginTop="2dp"
             android:text="Profile"
             android:textSize="11sp" />
+
+        <View
+            android:id="@+id/navProfileDot"
+            android:layout_width="16dp"
+            android:layout_height="3dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_nav_indicator" />
     </LinearLayout>
 </LinearLayout>

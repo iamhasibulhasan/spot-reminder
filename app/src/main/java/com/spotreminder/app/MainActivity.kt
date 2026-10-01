@@ -56,6 +56,8 @@ class MainActivity : AppCompatActivity() {
     private var suppressSpotWatcher = false
     private var cityLat: Double? = null
     private var cityLon: Double? = null
+    private var spotLat: Double? = null
+    private var spotLon: Double? = null
 
     private val mapLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
@@ -136,6 +138,8 @@ class MainActivity : AppCompatActivity() {
         dialogSpotInput = spotIn
         cityLat = null
         cityLon = null
+        spotLat = null
+        spotLon = null
 
         cityIn.setAdapter(cityAdapter)
         spotIn.setAdapter(spotAdapter)
@@ -154,6 +158,8 @@ class MainActivity : AppCompatActivity() {
         }
         spotIn.setOnItemClickListener { _, _, position, _ ->
             val s = spotSuggestions.getOrNull(position) ?: return@setOnItemClickListener
+            spotLat = s.lat
+            spotLon = s.lon
             suppressSpotWatcher = true
             spotIn.setText(s.name)
             spotIn.setSelection(spotIn.text?.length ?: 0)
@@ -178,6 +184,7 @@ class MainActivity : AppCompatActivity() {
             override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 if (suppressSpotWatcher) return
+                spotLat = null; spotLon = null
                 val q = s?.toString().orEmpty()
                 spotSuggestRunnable?.let { mainHandler.removeCallbacks(it) }
                 val r = Runnable { fetchSpotSuggestions(spotIn, q) }
@@ -374,9 +381,10 @@ class MainActivity : AppCompatActivity() {
 
         val list = Store.load(this)
         val entry = list.firstOrNull { it.key == key }
-            ?: CityEntry(key, Store.titleCase(city), mutableListOf()).also { list.add(it) }
+            ?: CityEntry(key, Store.titleCase(city), mutableListOf(), cityLat, cityLon).also { list.add(it) }
+        if (entry.lat == null && cityLat != null) { entry.lat = cityLat; entry.lon = cityLon }
         if (entry.spots.none { Store.norm(it.name) == Store.norm(spot) }) {
-            entry.spots.add(Spot(Store.titleCase(spot), false))
+            entry.spots.add(Spot(Store.titleCase(spot), false, spotLat, spotLon))
         }
         Store.save(this, list)
         toast("Spot saved.")
