@@ -6,8 +6,26 @@ import org.json.JSONObject
 /** One recorded GPS point along a trip's path. */
 data class TrackPoint(val lat: Double, val lon: Double, val time: Long)
 
-/** One line item in a trip's cost breakdown. */
-data class CostItem(val category: String, val amount: Double)
+/**
+ * One expense entry. `category` is one of [COST_CATEGORIES]' names (or any custom text).
+ * `title` is an optional one-line label shown instead of the category name when set.
+ * `time` is this entry's own timestamp — a trip can span days, so each cost is dated
+ * individually (that's what lets a "today" vs "total" view work).
+ */
+data class CostItem(
+    val category: String,
+    val amount: Double,
+    val title: String = "",
+    val paymentMethod: String = "Cash",
+    val note: String = "",
+    val time: Long = System.currentTimeMillis(),
+    val lat: Double? = null,
+    val lon: Double? = null,
+    val placeLabel: String? = null
+) {
+    /** What to show as the entry's headline: the custom title if any, else the category name. */
+    val displayTitle: String get() = title.ifBlank { category }
+}
 
 /** A single visit to a spot: when it started/ended, the path taken, and what it cost. */
 data class Trip(
@@ -70,7 +88,15 @@ data class Trip(
             val costs = JSONArray()
             for (c in t.costs) {
                 val co = JSONObject()
-                co.put("category", c.category); co.put("amount", c.amount)
+                co.put("category", c.category)
+                co.put("amount", c.amount)
+                co.put("title", c.title)
+                co.put("paymentMethod", c.paymentMethod)
+                co.put("note", c.note)
+                co.put("time", c.time)
+                c.lat?.let { co.put("lat", it) }
+                c.lon?.let { co.put("lon", it) }
+                c.placeLabel?.let { co.put("placeLabel", it) }
                 costs.put(co)
             }
             o.put("costs", costs)
@@ -91,7 +117,19 @@ data class Trip(
             if (ca != null) {
                 for (i in 0 until ca.length()) {
                     val co = ca.getJSONObject(i)
-                    costs.add(CostItem(co.getString("category"), co.getDouble("amount")))
+                    costs.add(
+                        CostItem(
+                            category = co.getString("category"),
+                            amount = co.getDouble("amount"),
+                            title = co.optString("title", ""),
+                            paymentMethod = co.optString("paymentMethod", "Cash"),
+                            note = co.optString("note", ""),
+                            time = if (co.has("time")) co.optLong("time") else o.optLong("startTime"),
+                            lat = if (co.has("lat")) co.optDouble("lat") else null,
+                            lon = if (co.has("lon")) co.optDouble("lon") else null,
+                            placeLabel = if (co.has("placeLabel")) co.optString("placeLabel") else null
+                        )
+                    )
                 }
             }
             return Trip(

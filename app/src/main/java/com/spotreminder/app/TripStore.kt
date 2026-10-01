@@ -3,9 +3,6 @@ package com.spotreminder.app
 import android.content.Context
 import org.json.JSONArray
 
-/** Quick-pick cost categories shown when adding a cost (any custom text is also allowed). */
-val TRIP_COST_CATEGORIES = listOf("Bus", "Food", "Tickets", "Other")
-
 object TripStore {
     private const val PREFS = "trip_store"
     private const val KEY_TRIPS = "trips"

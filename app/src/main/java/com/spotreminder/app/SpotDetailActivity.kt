@@ -141,7 +141,7 @@ class SpotDetailActivity : AppCompatActivity() {
                 }
                 for (c in t.costs) {
                     chipRow.addView(TextView(this).apply {
-                        text = "${c.category}: ${"%.0f".format(c.amount)}"
+                        text = "${findCostCategory(c.category).emoji} ${c.displayTitle}: ${"%.0f".format(c.amount)}"
                         textSize = 11f
                         setTextColor(color(R.color.river_soft))
                         setPadding(dp(8), dp(4), dp(8), dp(4))

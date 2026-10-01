@@ -116,13 +116,21 @@ class SpotsActivity : AppCompatActivity() {
             for (c in active.costs) {
                 val row = LinearLayout(this).apply {
                     orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
                     ).apply { topMargin = dp(4) }
                 }
                 row.addView(TextView(this).apply {
-                    text = c.category
+                    text = findCostCategory(c.category).emoji
                     textSize = 13f
+                    setPadding(0, 0, dp(6), 0)
+                })
+                row.addView(TextView(this).apply {
+                    text = "${c.displayTitle} · ${c.paymentMethod}"
+                    textSize = 13f
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
                     setTextColor(Color.WHITE)
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 })
