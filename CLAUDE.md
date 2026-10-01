@@ -27,14 +27,15 @@ Edit source files directly under `app/src/main/` like any normal Android project
 - `App.kt` — Application class, applies saved theme on launch.
 - `MainActivity.kt` — Home screen: detected-city status, "Add a spot" popup (OSM autocomplete via `Osm.kt`), kicks off the periodic WorkManager job.
 - `SpotsActivity.kt` / `SpotDetailActivity.kt` — city/spot list and per-spot trip history; start/end a trip, add costs (live during a trip or after it's finished), navigate to a spot.
-- `CostDialogs.kt` — the shared "Add a cost" popup used from both the active-trip banner and a finished trip's history card.
+- `CostCategories.kt` — the fixed, icon+color expense category list and payment-method list (the categorized-expense business logic, ported from a common travel expense-tracker pattern), plus `Calc`, a small evaluator for calculator-style amount input ("25+10").
+- `CostDialogs.kt` — the shared "Add a cost" popup (category picker, title, calculator amount, payment method, captured location) used from both the active-trip banner and a finished trip's history card.
 - `MapPickerActivity.kt` / `TripMapActivity.kt` / `NavigateActivity.kt` — osmdroid map screens: pick a location, replay a completed trip's recorded route, or navigate from your current location to a saved spot (driving route + distance/time via `Routing.kt`, no live traffic).
 - `Routing.kt` — calls the free public OSRM demo server for a driving route between two points (geometry, distance, duration). No traffic data; that needs a paid API this project doesn't use.
-- `StatsActivity.kt` — aggregates `Trip` records: distance (haversine), cost, per-category breakdown.
+- `StatsActivity.kt` — aggregates `Trip` records: distance (haversine), cost breakdown by category, and a "Recent expenses" ledger (every cost entry across all trips, newest first, grouped by day with a per-day subtotal).
 - `ProfileActivity.kt` — local profile fields + Google Sign-In, triggers `DriveBackup.kt`.
 - `SettingsActivity.kt` — theme + location/notification permission management.
 - `Store.kt` — SharedPreferences-backed JSON store for cities/spots/theme/profile/last-notified-city. `CityEntry`/`Spot` carry optional `lat`/`lon` (set when added via map pick or a search suggestion, or geocoded once on first navigate and cached back). `rawData()`/`setRawData()` exist specifically for Drive backup/restore serialization.
-- `TripStore.kt` / `Trip.kt` — separate SharedPreferences-backed store for `Trip` records (path points, cost items, note) + haversine distance calc. Costs can be appended to the active trip or to an already-saved one (`addCostToActiveTrip` / `addCostToTrip`).
+- `TripStore.kt` / `Trip.kt` — separate SharedPreferences-backed store for `Trip` records (path points, cost items, note) + haversine distance calc. `CostItem` carries its own timestamp (not just the trip's), a title, payment method, and optional captured location — costs can be appended to the active trip or to an already-saved one (`addCostToActiveTrip` / `addCostToTrip`).
 - `TripTrackingService.kt` — foreground Service recording GPS points during an active trip; tracks a single location provider (GPS preferred) and filters out low-accuracy/implausible-speed fixes so the recorded route doesn't zig-zag.
 - `LocationChecker.kt` — core arrival-detection logic: last/fresh GPS fix → reverse geocode (Android `Geocoder`, falls back to Nominatim REST) → normalize/fuzzy-match against saved city keys → `Notifier`. `currentLocation()` is the public entry point other screens (e.g. `NavigateActivity`) use to get a one-off fix.
 - `LocationWorker.kt` — WorkManager `Worker` running `LocationChecker` roughly every 15 minutes.
