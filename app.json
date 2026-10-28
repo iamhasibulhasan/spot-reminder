@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Spot Reminder",
+    "slug": "spot-reminder",
+    "scheme": "spotreminder",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#0B1220",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F4F7F8",
+      "dark": { "image": "./assets/splash-icon.png", "backgroundColor": "#0B1220" }
+    },
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.spotreminder.app" },
+    "android": {
+      "package": "com.spotreminder.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#0D9488",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE", "FOREGROUND_SERVICE_LOCATION", "POST_NOTIFICATIONS"
+      ]
+    },
+    "web": { "favicon": "./assets/favicon.png" },
+    "plugins": [
+      "expo-splash-screen",
+      "expo-web-browser",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Spot Reminder needs your location to alert you near saved spots and record your travel path.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      ["expo-notifications", { "icon": "./assets/android-icon-monochrome.png", "color": "#0D9488" }],
+      ["expo-image-picker", { "photosPermission": "Choose a profile photo." }]
+    ]
+  }
+}
