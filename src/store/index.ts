@@ -6,7 +6,7 @@ import { startTracking, stopTracking, syncGeofences } from '../services/tasks';
 import { Expense, Settings, Spot, Track, User } from '../types';
 import { pathDistance } from '../utils/geo';
 
-type NewSpot = Pick<Spot, 'name' | 'district' | 'country' | 'lat' | 'lng' | 'radius' | 'notify' | 'travelers' | 'note'>;
+type NewSpot = Pick<Spot, 'name' | 'district' | 'country' | 'lat' | 'lng' | 'radius' | 'notify' | 'travelers' | 'note' | 'type' | 'photo' | 'budget'>;
 
 type State = {
   ready: boolean;
@@ -100,7 +100,7 @@ export const useStore = create<State>((set, get) => {
 
     addSpot: async (s) => {
       const spot: Spot = {
-        ...s, id: uid(), visited: false, travel: {}, expenses: [], createdAt: Date.now(),
+        ...s, id: uid(), visited: false, travel: {}, expenses: [], checklist: [], createdAt: Date.now(),
       };
       await saveSpots([spot, ...get().spots]);
       return spot.id;

@@ -3,6 +3,8 @@ import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { FadeInUp, Float } from '../components/anim';
 import { Logo } from '../components/Logo';
 import { Button, Field, Screen } from '../components/ui';
 import { googleConfig, googleEnabled, loginLocal, loginWithGoogleToken, registerLocal } from '../services/auth';
@@ -51,14 +53,23 @@ export function AuthScreen() {
     <Screen>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: 24, flexGrow: 1, justifyContent: 'center' }} keyboardShouldPersistTaps="handled">
-          <View style={{ alignItems: 'center', marginBottom: 28 }}>
-            <Logo size={96} variant={dark ? 'dark' : 'light'} />
-            <Text style={{ color: c.text, fontSize: 28, fontWeight: '800', marginTop: 14 }}>Spot Reminder</Text>
-            <Text style={{ color: c.sub, marginTop: 4 }}>
+          <LinearGradient
+            colors={dark ? ['#0F766E', '#0B3A5B'] : ['#14B8A6', '#0369A1']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={{ alignItems: 'center', borderRadius: 28, paddingVertical: 28, marginBottom: 24, overflow: 'hidden' }}
+          >
+            <View style={{ position: 'absolute', right: -40, top: -40, width: 150, height: 150, borderRadius: 75, backgroundColor: '#FFFFFF1A' }} />
+            <View style={{ position: 'absolute', left: -30, bottom: -50, width: 120, height: 120, borderRadius: 60, backgroundColor: '#FFFFFF14' }} />
+            <Float style={{ position: 'absolute', left: 24, top: 18 }} amount={5}><Text style={{ fontSize: 26 }}>🏖️</Text></Float>
+            <Float style={{ position: 'absolute', right: 26, top: 40 }} amount={7} duration={2300}><Text style={{ fontSize: 24 }}>✈️</Text></Float>
+            <Float style={{ position: 'absolute', right: 40, bottom: 20 }} amount={4} duration={2000}><Text style={{ fontSize: 22 }}>⛰️</Text></Float>
+            <Logo size={92} variant={dark ? 'dark' : 'light'} />
+            <Text style={{ color: '#fff', fontSize: 28, fontWeight: '800', marginTop: 12 }}>Spot Reminder</Text>
+            <Text style={{ color: '#FFFFFFD9', marginTop: 4 }}>
               {mode === 'login' ? 'Welcome back, traveller' : 'Create your travel account'}
             </Text>
-          </View>
-
+          </LinearGradient>
+          <FadeInUp>
           {mode === 'register' && <Field label="Name" value={name} onChangeText={setName} placeholder="Your name" />}
           <Field label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="you@gmail.com" />
           <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry placeholder="At least 6 characters" />
@@ -79,6 +90,7 @@ export function AuthScreen() {
             />
           )}
 
+          </FadeInUp>
           <Text onPress={() => setMode(mode === 'login' ? 'register' : 'login')} style={{ color: c.primary, textAlign: 'center', marginTop: 22, fontWeight: '700' }}>
             {mode === 'login' ? "New here? Create an account" : 'Already have an account? Sign in'}
           </Text>

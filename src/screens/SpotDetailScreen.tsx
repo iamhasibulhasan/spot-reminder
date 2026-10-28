@@ -1,8 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import * as Crypto from 'expo-crypto';
 import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert, Linking, Share, TextInput, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { FadeInUp } from '../components/anim';
 import { OsmMap } from '../components/OsmMap';
+import { SpotCover } from '../components/SpotCover';
+import { pickPhoto } from '../services/photos';
+import { osmLink } from '../utils/geo';
 import { Button, Card, Chip, Empty, Field, Header, IconButton, Screen, Stat } from '../components/ui';
 import { useStore } from '../store';
 import { useTheme } from '../theme';
@@ -22,11 +28,32 @@ export function SpotDetailScreen() {
   const spot = spots.find((s) => s.id === id);
   const [editing, setEditing] = useState<Partial<Expense> | null>(null);
   const [editTravel, setEditTravel] = useState(false);
+  const [item, setItem] = useState('');
+  const insets = useSafeAreaInsets();
 
   if (!spot) return null;
   const cur = settings.currency;
   const sum = summarize(spot);
   const setTravel = (patch: Partial<SpotTravel>) => updateSpot(spot.id, { travel: { ...spot.travel, ...patch } });
+
+  const shareReport = () => {
+    const lines = spot.expenses.map((e) => `• ${e.title} (${catMeta(e.category).label}): ${money(e.amount, cur)}`).join('\n');
+    Share.share({
+      message:
+        `🧳 ${spot.name} — ${[spot.district, spot.country].filter(Boolean).join(', ')}\n` +
+        (spot.travel.from ? `Route: ${spot.travel.from} → ${spot.travel.to || spot.name}\n` : '') +
+        (spot.travel.startDate ? `Dates: ${spot.travel.startDate} → ${spot.travel.endDate || '?'}\n` : '') +
+        `\n${lines || 'No expenses'}\n\nTotal: ${money(sum.total, cur)}  ·  Per person: ${money(sum.perPerson, cur)}\n${osmLink(spot)}`,
+    });
+  };
+
+  const checklist = spot.checklist ?? [];
+  const setChecklist = (list: typeof checklist) => updateSpot(spot.id, { checklist: list });
+  const addItem = () => {
+    if (!item.trim()) return;
+    setChecklist([...checklist, { id: Crypto.randomUUID(), text: item.trim(), done: false }]);
+    setItem('');
+  };
 
   const confirmDelete = () =>
     Alert.alert('Delete spot?', `"${spot.name}" and all its costs will be removed.`, [
@@ -35,14 +62,34 @@ export function SpotDetailScreen() {
     ]);
 
   return (
-    <Screen>
-      <Header
-        title={spot.name}
-        onBack={() => nav.goBack()}
-        right={<IconButton icon="trash-outline" color={c.danger} onPress={confirmDelete} />}
-      />
-      <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 0, paddingBottom: 40 }}>
-        <Text style={{ color: c.sub, marginBottom: 10 }}>{[spot.district, spot.country].filter(Boolean).join(', ')}</Text>
+    <Screen edges={[]}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        <SpotCover spot={spot} height={230 + insets.top} radius={0} style={{ borderBottomLeftRadius: 30, borderBottomRightRadius: 30 }}>
+          <View style={{ position: 'absolute', top: insets.top + 8, left: 12, right: 12, flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Pressable onPress={() => nav.goBack()} style={{ backgroundColor: '#0007', borderRadius: 20, padding: 8 }}>
+              <Ionicons name="chevron-back" size={22} color="#fff" />
+            </Pressable>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Pressable onPress={async () => { const p = await pickPhoto([16, 9]); if (p) updateSpot(spot.id, { photo: p }); }} style={{ backgroundColor: '#0007', borderRadius: 20, padding: 8 }}>
+                <Ionicons name="camera" size={20} color="#fff" />
+              </Pressable>
+              <Pressable onPress={confirmDelete} style={{ backgroundColor: '#0007', borderRadius: 20, padding: 8 }}>
+                <Ionicons name="trash-outline" size={20} color="#fff" />
+              </Pressable>
+            </View>
+          </View>
+          <View style={{ position: 'absolute', left: 18, right: 18, bottom: 18 }}>
+            <Text style={{ color: '#fff', fontSize: 26, fontWeight: '800', textShadowColor: '#0008', textShadowRadius: 6 }} numberOfLines={2}>{spot.name}</Text>
+            <Text style={{ color: '#FFFFFFE6', marginTop: 2 }}>📍 {[spot.district, spot.country].filter(Boolean).join(', ')}</Text>
+          </View>
+        </SpotCover>
+        <View style={{ padding: 16 }}>
+        <FadeInUp>
+          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
+            <Button title="Directions" icon="navigate" onPress={() => Linking.openURL(`geo:${spot.lat},${spot.lng}?q=${spot.lat},${spot.lng}(${encodeURIComponent(spot.name)})`).catch(() => Linking.openURL(osmLink(spot)))} style={{ flex: 1 }} />
+            <Button title="Share report" icon="share-social" kind="ghost" onPress={shareReport} style={{ flex: 1 }} />
+          </View>
+        </FadeInUp>
         <OsmMap style={{ height: 160, borderRadius: 16, marginBottom: 14 }} spots={[{ ...spot, sub: spot.district, radius: spot.radius }]} fitKey={spot.id} />
 
         <Card style={{ marginBottom: 14 }}>
@@ -65,6 +112,19 @@ export function SpotDetailScreen() {
             <Stat label={`Per person (${spot.travelers})`} value={money(sum.perPerson, cur)} />
             <Stat label={sum.days ? `Per day (${sum.days}d)` : 'Per day'} value={sum.days ? money(sum.perDay, cur) : '—'} />
           </View>
+          {!!spot.budget && (
+            <View style={{ marginTop: 14 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={{ color: c.sub, fontSize: 12 }}>Budget {money(spot.budget, cur)}</Text>
+                <Text style={{ color: sum.total > spot.budget ? c.danger : '#16a34a', fontSize: 12, fontWeight: '700' }}>
+                  {sum.total > spot.budget ? `Over by ${money(sum.total - spot.budget, cur)}` : `${money(spot.budget - sum.total, cur)} left`}
+                </Text>
+              </View>
+              <View style={{ height: 8, borderRadius: 4, backgroundColor: c.border, overflow: 'hidden' }}>
+                <View style={{ width: `${Math.min(100, (sum.total / spot.budget) * 100)}%`, height: 8, backgroundColor: sum.total > spot.budget ? c.danger : c.primary }} />
+              </View>
+            </View>
+          )}
           {sum.byCategory.length > 0 && (
             <View style={{ marginTop: 14 }}>
               <View style={{ flexDirection: 'row', height: 10, borderRadius: 5, overflow: 'hidden', marginBottom: 10 }}>
@@ -106,6 +166,7 @@ export function SpotDetailScreen() {
                   <Chip key={m.key} label={m.key} icon={m.icon} active={spot.travel.mode === m.key} onPress={() => setTravel({ mode: m.key })} />
                 ))}
               </View>
+              <Field label="Budget" value={spot.budget ? String(spot.budget) : ''} keyboardType="decimal-pad" onChangeText={(v) => updateSpot(spot.id, { budget: parseFloat(v) || undefined })} />
               <Field
                 label="Travellers" value={String(spot.travelers)} keyboardType="number-pad"
                 onChangeText={(v) => updateSpot(spot.id, { travelers: Math.max(1, parseInt(v) || 1) })}
@@ -122,6 +183,31 @@ export function SpotDetailScreen() {
               </Text>
             </View>
           )}
+        </Card>
+
+        {/* Checklist */}
+        <Card style={{ marginBottom: 14 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+            <Text style={{ fontSize: 18 }}>🎒</Text>
+            <Text style={{ color: c.text, fontWeight: '800', fontSize: 16, flex: 1, marginLeft: 8 }}>Packing & to-do</Text>
+            <Text style={{ color: c.sub, fontWeight: '700' }}>{checklist.filter((i) => i.done).length}/{checklist.length}</Text>
+          </View>
+          {checklist.map((i) => (
+            <View key={i.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6 }}>
+              <Pressable onPress={() => setChecklist(checklist.map((x) => (x.id === i.id ? { ...x, done: !x.done } : x)))} style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <Ionicons name={i.done ? 'checkbox' : 'square-outline'} size={22} color={i.done ? c.primary : c.sub} />
+                <Text style={{ color: i.done ? c.sub : c.text, marginLeft: 10, textDecorationLine: i.done ? 'line-through' : 'none', flex: 1 }}>{i.text}</Text>
+              </Pressable>
+              <IconButton icon="close" size={18} color={c.sub} onPress={() => setChecklist(checklist.filter((x) => x.id !== i.id))} />
+            </View>
+          ))}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+            <TextInput
+              value={item} onChangeText={setItem} onSubmitEditing={addItem} placeholder="Add item (tickets, charger…)" placeholderTextColor={c.sub}
+              style={{ flex: 1, backgroundColor: c.input, color: c.text, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: c.border }}
+            />
+            <IconButton icon="add-circle" size={32} color={c.primary} onPress={addItem} />
+          </View>
         </Card>
 
         {/* Expenses */}
@@ -147,6 +233,7 @@ export function SpotDetailScreen() {
             </Pressable>
           );
         })}
+        </View>
       </ScrollView>
 
       {editing && (

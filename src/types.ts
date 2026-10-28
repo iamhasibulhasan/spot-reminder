@@ -20,6 +20,10 @@ export type SpotTravel = {
   mode?: 'bus' | 'train' | 'car' | 'bike' | 'flight' | 'boat' | 'walk';
 };
 
+export type SpotType = 'beach' | 'mountain' | 'city' | 'forest' | 'heritage' | 'food' | 'other';
+
+export type ChecklistItem = { id: string; text: string; done: boolean };
+
 export type Spot = {
   id: string;
   name: string;
@@ -32,6 +36,10 @@ export type Spot = {
   visited: boolean;
   travelers: number;
   note?: string;
+  type?: SpotType;
+  photo?: string;
+  budget?: number;
+  checklist?: ChecklistItem[];
   travel: SpotTravel;
   expenses: Expense[];
   createdAt: number;

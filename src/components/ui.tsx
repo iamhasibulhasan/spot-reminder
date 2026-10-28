@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../theme';
+import { Float } from './anim';
 
 type Icon = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -103,12 +104,18 @@ export function IconButton({ icon, onPress, color, size = 22 }: { icon: Icon; on
   );
 }
 
-export function Empty({ icon, text }: { icon: Icon; text: string }) {
+export function Empty({ icon, text, emoji }: { icon: Icon; text: string; emoji?: string }) {
   const { c } = useTheme();
   return (
-    <View style={{ alignItems: 'center', padding: 40 }}>
-      <Ionicons name={icon} size={56} color={c.border} />
-      <Text style={{ color: c.sub, marginTop: 10, textAlign: 'center' }}>{text}</Text>
+    <View style={{ alignItems: 'center', padding: 36 }}>
+      <Float>
+        <View style={{ width: 110, height: 110, borderRadius: 55, backgroundColor: c.primary + '1F', alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: c.primary + '2E', alignItems: 'center', justifyContent: 'center' }}>
+            {emoji ? <Text style={{ fontSize: 40 }}>{emoji}</Text> : <Ionicons name={icon} size={40} color={c.primary} />}
+          </View>
+        </View>
+      </Float>
+      <Text style={{ color: c.sub, marginTop: 16, textAlign: 'center', lineHeight: 20 }}>{text}</Text>
     </View>
   );
 }
@@ -117,7 +124,7 @@ export function Stat({ label, value, color }: { label: string; value: string; co
   const { c } = useTheme();
   return (
     <View style={{ flex: 1 }}>
-      <Text style={{ color: c.sub, fontSize: 12 }}>{label}</Text>
+      <Text style={{ color: color ?? c.sub, opacity: color ? 0.85 : 1, fontSize: 12 }}>{label}</Text>
       <Text style={{ color: color ?? c.text, fontSize: 17, fontWeight: '800', marginTop: 2 }}>{value}</Text>
     </View>
   );

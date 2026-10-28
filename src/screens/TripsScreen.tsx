@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import React, { useCallback } from 'react';
 import { Alert, FlatList, Pressable, Text, View } from 'react-native';
+import { FadeInUp, PulseDot } from '../components/anim';
 import { Button, Card, Empty, Header, Screen } from '../components/ui';
 import { useStore } from '../store';
 import { useTheme } from '../theme';
@@ -38,12 +39,12 @@ export function TripsScreen() {
             style={{ marginBottom: 14 }}
           />
         }
-        ListEmptyComponent={<Empty icon="footsteps-outline" text="Recorded trips appear here, with the path you travelled." />}
-        renderItem={({ item }) => (
-          <Pressable onPress={() => nav.navigate('TrackDetail', { id: item.id })}>
+        ListEmptyComponent={<Empty emoji="👣" icon="footsteps-outline" text="Recorded trips appear here, with the path you travelled." />}
+        renderItem={({ item, index }) => (
+          <FadeInUp index={index}><Pressable onPress={() => nav.navigate('TrackDetail', { id: item.id })}>
             <Card style={{ marginBottom: 10, flexDirection: 'row', alignItems: 'center' }}>
               <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: c.primary + '22', alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name={item.id === activeTrackId ? 'radio-button-on' : 'trail-sign'} size={22} color={item.id === activeTrackId ? c.danger : c.primary} />
+                {item.id === activeTrackId ? <PulseDot color={c.danger} /> : <Ionicons name="trail-sign" size={22} color={c.primary} />}
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={{ color: c.text, fontWeight: '700' }} numberOfLines={1}>{item.name}</Text>
@@ -53,7 +54,7 @@ export function TripsScreen() {
               </View>
               <Text style={{ color: c.text, fontWeight: '800' }}>{formatDistance(item.distance)}</Text>
             </Card>
-          </Pressable>
+          </Pressable></FadeInUp>
         )}
       />
     </Screen>
